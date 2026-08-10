@@ -14,7 +14,8 @@ selection_table(x, converged_only = TRUE)
 \value{
 A tibble, sorted by AIC, with \code{model_id}, \code{key}, \code{adjustment},
 \code{order}, \code{formula}, \code{converged}, \code{n_par}, \code{aic}, \code{delta_aic}, \code{p}, \code{p_se},
-\code{p_cv}, \code{esw}, and \code{cvm_p}.
+\code{p_cv}, \code{esw}, and a goodness-of-fit p-value in \code{cvm_p} (exact distances)
+or \code{chisq_p} (binned).
 }
 \description{
 The ranked selection table from a sweep

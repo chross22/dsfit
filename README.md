@@ -13,9 +13,10 @@ Takes the flatfile produced by [`distsamp`](https://github.com/chross22/distsamp
 `mrds`, and returns a selection table carrying effective strip half-width and its
 CV alongside each AIC.
 
-> **Status: skeleton.** The model set, the sweep, and the input guards are built
-> and tested. The `g(0)` correction slot, the `dsm` handoff, and the snapshot
-> regression tests are not yet written. See [docs/01-plan.md](docs/01-plan.md).
+> **Status: skeleton.** The model set, the sweep, the input guards, and
+> snapshot regression tests pinning the selection are built and tested. The
+> `g(0)` correction slot and the `dsm` handoff are not yet written. See
+> [docs/01-plan.md](docs/01-plan.md).
 
 ## Install
 
@@ -65,6 +66,32 @@ than a model set. Refused, with the reason.
 **Effective strip half-width sits next to the AIC.** It is what propagates into
 density. Two models within 2 AIC of one another can imply materially different
 abundance, and nothing in an AIC column shows that.
+
+## Goodness of fit, and which test you get
+
+A model can top the AIC ranking and still fail a goodness-of-fit test, so one
+sits in the table. Which one follows the data rather than a preference:
+Cramér-von Mises (`cvm_p`) for exact distances, and a chi-square over the
+survey's own bins (`chisq_p`) for binned ones, which have no empirical
+distribution for CvM to test. `print()` shows whichever applies.
+
+Both columns are named for their test, because a p-value read without knowing
+what produced it is worse than no p-value. `chisq_p` is filled in for exact fits
+too, but over cutpoints `mrds` chooses rather than bins anyone surveyed — read
+`cvm_p` there.
+
+## Snapshot tests, and why they are the point
+
+The sweep *selects* a model. The snapshots in
+`tests/testthat/test-selection-snapshot.R` pin the selection — the whole table,
+not just the winner — so that an `mrds` upgrade cannot quietly change which
+model wins or by how much. A swap between models three and four is the same
+change arriving early enough to look at.
+
+This is the requirement that made the middle layer a package. Writing them
+turned up a live bug in which a candidate that failed to fit shifted every model
+below it onto the wrong row, producing a wrong selection table rather than an
+error.
 
 ## The gamma key
 
@@ -122,3 +149,61 @@ analysis   which years, which truncation, which covariates, the report
 
 The middle layer is a package because its logic needs tests. The outer layer is
 not, because its choices change every run.
+
+## Citing dsfit
+
+```r
+citation("dsfit")
+```
+
+That returns up to three entries — the package, the `mrds` toolchain every fit
+comes off, and the gamma key function if you selected a gamma model:
+
+```
+Ross, C. dsfit: Fit and Compare Detection Functions for Line-Transect Survey
+Data. R package. https://github.com/chross22/dsfit
+
+Miller, D.L., Rexstad, E., Thomas, L., Marshall, L. and Laake, J.L. (2019)
+Distance sampling in R. Journal of Statistical Software 89(1):1-28.
+doi:10.18637/jss.v089.i01
+
+Becker, E.A. and Quang, P.X. (2009) A gamma-shaped detection function for
+line-transect surveys with mark-recapture and covariate data. Journal of
+Agricultural, Biological and Environmental Statistics 14:207-223.
+doi:10.1198/jabes.2009.0013
+```
+
+The package version comes from `DESCRIPTION` at install time, so it is always
+the version you actually have. Record the truncation and the model set as well:
+a selection table is not reproducible without them.
+
+## References
+
+What each source is relied on for is in [tools/citations.csv](tools/citations.csv).
+They are checked monthly by CI — DOIs still resolve and still describe the paper
+cited.
+
+Becker, E.A. and Quang, P.X. (2009) A gamma-shaped detection function for
+line-transect surveys with mark-recapture and covariate data. *Journal of
+Agricultural, Biological and Environmental Statistics* 14:207–223.
+<https://doi.org/10.1198/jabes.2009.0013>
+— *the gamma key, and the aerial-survey case it was developed for.*
+
+Buckland, S.T., Anderson, D.R., Burnham, K.P., Laake, J.L., Borchers, D.L. and
+Thomas, L. (2001) *Introduction to Distance Sampling: Estimating Abundance of
+Biological Populations.* Oxford University Press.
+— *the standard line-transect reference.*
+
+Laake, J.L. and Borchers, D.L. (2004) Methods for incomplete detection at
+distance zero. In *Advanced Distance Sampling*, pp. 108–189. Oxford University
+Press.
+— *why `g(0)` is not estimable from single-observer data.*
+
+Marques, F.F.C. and Buckland, S.T. (2004) Covariate models for the detection
+function. In *Advanced Distance Sampling*, pp. 31–47. Oxford University Press.
+— *covariate detection functions, which is what `mcds` fits.*
+
+Miller, D.L., Rexstad, E., Thomas, L., Marshall, L. and Laake, J.L. (2019)
+Distance sampling in R. *Journal of Statistical Software* 89(1):1–28.
+<https://doi.org/10.18637/jss.v089.i01>
+— *the `Distance` and `mrds` toolchain this package fits through.*

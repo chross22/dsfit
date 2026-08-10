@@ -12,9 +12,54 @@ First skeleton. The detection-function half of the fitting layer described in
   truncation, so every AIC in the table comes off the same likelihood
   machinery.
 * `selection_table()` — the ranked result, carrying `p`, `p_se`, `p_cv`, `esw`
-  and a Cramér-von Mises p-value next to each AIC.
+  and a goodness-of-fit p-value next to each AIC.
 * `prepare_distance_data()` — the input guards, exported because they are worth
   running before committing to a model set.
+
+## Pinning the selection
+
+* Snapshot regression tests over the whole selection table, which is the
+  requirement that made this layer a package. The sweep *selects* a model;
+  these pin the selection, so an `mrds` upgrade cannot quietly change which
+  model wins or by how much. The whole table is pinned rather than the winner
+  alone — a swap between models three and four is the same underlying change
+  arriving while it is still cheap to look at. Six of them: key functions,
+  adjustment series and orders, the binned likelihood, covariate models, left
+  truncation, and what the sweep prints about itself.
+
+  When one fails the question is not whether the new number looks reasonable
+  but what changed underneath. The fixtures behind them live in
+  `tests/testthat/helper-fixtures.R` and are deliberately fixed; changing a
+  seed there invalidates every snapshot, and that is a data change rather than
+  a regression.
+
+* Writing them found a real one, which is rather the point. A candidate that
+  failed to fit was removed from the list of fits rather than emptied, so every
+  model after it in the set inherited the previous one's AIC, `p̄` and `esw` —
+  a wrong selection table rather than an error. Fixed, with a test that checks
+  each row's AIC against the fit stored under that row's `model_id`.
+
+## Goodness of fit for binned data
+
+* `chisq_p` joins `cvm_p` in the selection table. Cramér-von Mises tests the
+  empirical distribution of exact distances, and `mrds` does not compute it for
+  a binned fit, which has none — so before this a binned sweep carried no
+  goodness-of-fit at all, in a column that looked like it did. Binned fits now
+  get a chi-square over the survey's own bins, and `print()` shows whichever
+  test applies.
+
+  `chisq_p` is filled in for exact fits too, but over cutpoints `mrds` chooses
+  rather than bins the survey defined; a test whose result moves with an
+  arbitrary binning is the weaker one, and `cvm_p` is what to read there. Both
+  columns are named for their test so a p-value is never separated from what
+  produced it.
+
+* A chi-square over few bins runs out of degrees of freedom — three bins and a
+  two-parameter key leave none — and reports `NA`. That is a converged model
+  with no test available, not a failed one.
+
+* Numeric columns of the selection table are no longer named after the models,
+  so pulling one out gives a bare vector.
 
 ## What it refuses, and why
 
@@ -66,6 +111,6 @@ Two things documented because they would otherwise be discovered the hard way:
 
 ## Not yet built
 
-`g(0)` correction, the `dsm` handoff, snapshot regression tests over the
-selection table, plotting detectability against a covariate (a different
-quantity from g(x), and not the same plot), and a vignette.
+`g(0)` correction, the `dsm` handoff, plotting detectability against a
+covariate (a different quantity from g(x), and not the same plot), and a
+vignette.

@@ -41,7 +41,15 @@ package does not replace it. Two reasons to go a level down for a sweep:
 ## 3. What is built
 
 `model_set()`, `sweep_models()`, `selection_table()`, `prepare_distance_data()`,
-and a `print()` method. 77 tests.
+and a `print()` method. 137 tests, six of them snapshots over the selection
+table.
+
+Left truncation is here too, as `sweep_models(left = )` — the statistically
+correct treatment of a blind spot beneath the platform, rather than shifting
+bins. `distsamp`'s next-steps list used to carry it; it is fitting-side, so it
+belongs to this layer, and that list now points here. The same applies to
+truncation and binned fitting, and to the `g(0)` slot below: one list owns each
+item.
 
 ### The conditions a comparison needs
 
@@ -61,38 +69,56 @@ invalidates a ranking rather than failing:
 ### Ranking on more than AIC
 
 The selection table carries, per model: `aic`, `delta_aic`, `n_par`, `p`,
-`p_se`, `p_cv`, `esw`, `cvm_p`, `converged`.
+`p_se`, `p_cv`, `esw`, `cvm_p`, `chisq_p`, `converged`.
 
 `esw` is there because it is what propagates into density, and two models within
 2 AIC of one another can imply materially different abundance. On the package's
 own example, `hn`, `gamma` and `hr` span 120 to 151 in `esw` — a 26% spread —
 while the top two AICs differ by less than the third's advantage suggests.
 
-Cramér-von Mises is reported because a model can top the AIC ranking and still
-fail a goodness-of-fit test. Its null is that the fitted function describes the
-observed distances, so a small p-value is evidence against the model.
+A goodness-of-fit p-value is reported because a model can top the AIC ranking
+and still fail one. Its null is that the fitted function describes the observed
+distances, so a small p-value is evidence against the model. Which test that is
+follows the data: Cramér-von Mises for exact distances, and a chi-square over
+the survey's bins for binned ones, which have no empirical distribution for CvM
+to test. Both columns are carried under their own names, because a p-value read
+without knowing its test is worse than no p-value.
+
+### The selection is pinned
+
+Snapshot regression tests over the whole table, which is the requirement that
+made this a package rather than scripts. The sweep *selects* a model; the
+snapshots *pin* the selection, so that an `mrds` or `Distance` upgrade cannot
+silently change which model wins. The whole table is pinned rather than the
+winner alone — a swap between models 3 and 4 is the same change arriving early.
+
+Six of them, over key functions, adjustment series and orders, the binned
+likelihood, covariate models, left truncation, and what the sweep prints. Values
+are rounded to a precision an optimiser can be expected to reproduce across
+platforms; the fixtures behind them are fixed in
+`tests/testthat/helper-fixtures.R`.
+
+Writing them turned up a live bug: a candidate that failed to fit was dropped
+from the list of fits rather than emptied, so every model after it inherited the
+previous one's AIC and `esw`. A wrong selection table, silently — which is the
+class of error this layer exists to catch.
 
 ## 4. What is not built
 
 In the order it is worth doing.
 
-1. **Snapshot regression tests over the selection table.** The requirement that
-   made this a package. The sweep *selects* a model; regression tests *pin* the
-   selection so that an `mrds` or `Distance` upgrade cannot silently change
-   which model wins. Snapshot the whole table, not just the winner — a change in
-   the ranking of models 3 and 4 is early warning.
-2. **The `g(0)` correction slot.** A value *and* its standard error, applied at
+1. **The `g(0)` correction slot.** A value *and* its standard error, applied at
    the abundance step, with three rules: no default and never silently 1;
    propagate the variance or refuse the correction, since its CV routinely
    dominates the CV of abundance; and name availability and perception
    separately, so it is visible which have been applied. See section 5 of the
    architecture document for why it cannot be estimated from a NARWC extract.
-3. **An MRDS backend**, conditional on data that actually carries double-observer
+2. **An MRDS backend**, conditional on data that actually carries double-observer
    structure — with a guard that errors when it does not, rather than fitting a
    single-observer model and reporting it as though perception bias were
    handled.
-4. **The `dsm` handoff**, from `distsamp::segments_as_sf(segs, "midpoints")`.
-5. **A vignette**, once there is something end-to-end to walk through.
+3. **The `dsm` handoff**, from `distsamp::segments_as_sf(segs, "midpoints")`.
+4. **A vignette**, once there is something end-to-end to walk through.
 
 ## 5. Deliberately out of scope
 

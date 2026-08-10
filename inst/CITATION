@@ -1,0 +1,49 @@
+## Version is taken from the installed DESCRIPTION via `meta`, so it can never
+## drift from the package it ships with.
+
+bibentry(
+  bibtype  = "Manual",
+  title    = "{dsfit}: Fit and Compare Detection Functions for Line-Transect Survey Data",
+  author   = person("Camille", "Ross", email = "camille.ross@maine.edu"),
+  year     = "2026",
+  note     = paste("R package version", meta$Version),
+  url      = "https://github.com/chross22/dsfit",
+  header   = "To cite the dsfit package:"
+)
+
+bibentry(
+  bibtype  = "Article",
+  title    = "Distance sampling in {R}",
+  author   = c(
+    person("David L.", "Miller"),
+    person("Eric", "Rexstad"),
+    person("Len", "Thomas"),
+    person("Laura", "Marshall"),
+    person("Jeffrey L.", "Laake")
+  ),
+  journal  = "Journal of Statistical Software",
+  year     = "2019",
+  volume   = "89",
+  number   = "1",
+  pages    = "1--28",
+  doi      = "10.18637/jss.v089.i01",
+  header   = paste(
+    "Every fit in this package comes off `mrds`, so cite the toolchain it",
+    "fits through:"
+  )
+)
+
+bibentry(
+  bibtype  = "Article",
+  title    = "A gamma-shaped detection function for line-transect surveys with mark-recapture and covariate data",
+  author   = c(
+    person("Earl A.", "Becker"),
+    person("Phuc X.", "Quang")
+  ),
+  journal  = "Journal of Agricultural, Biological and Environmental Statistics",
+  year     = "2009",
+  volume   = "14",
+  pages    = "207--223",
+  doi      = "10.1198/jabes.2009.0013",
+  header   = "To cite the gamma key function, if a gamma model was selected:"
+)

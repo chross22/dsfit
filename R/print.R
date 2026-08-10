@@ -19,9 +19,16 @@ print.dsfit_sweep <- function(x, ...) {
       dAIC = round(show$delta_aic, 2),
       p = round(show$p, 4),
       p_cv = round(show$p_cv, 3),
-      esw = round(show$esw, 1),
-      CvM_p = round(show$cvm_p, 3)
+      esw = round(show$esw, 1)
     )
+    # Only one goodness-of-fit test applies to any given sweep, and which one
+    # is decided by whether the distances are binned. Show that one, under its
+    # own name, rather than a column of NA under the other's.
+    if (all(is.na(show$cvm_p)) && any(!is.na(show$chisq_p))) {
+      out$chisq_p <- round(show$chisq_p, 3)
+    } else {
+      out$CvM_p <- round(show$cvm_p, 3)
+    }
     print(out, row.names = FALSE)
     if (nrow(ok) > 5) cat("  ... and ", nrow(ok) - 5, " more\n", sep = "")
     cat("\n  Rank on esw and p_cv as well as dAIC: models within 2 AIC can\n")

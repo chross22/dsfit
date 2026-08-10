@@ -21,10 +21,25 @@
 #' alongside the AIC, and [selection_table()] sorts on AIC only because
 #' something has to be first.
 #'
-#' A goodness-of-fit statistic is reported too: Cramér-von Mises, whose null is
-#' that the fitted function describes the observed distances. A small p-value is
-#' evidence against the model, and a model can be top of the AIC ranking and
-#' still fail it.
+#' A goodness-of-fit statistic is reported too, whose null is that the fitted
+#' function describes the observed distances. A small p-value is evidence
+#' against the model, and a model can be top of the AIC ranking and still fail
+#' it.
+#'
+#' Which test to read follows the data rather than a preference. Exact distances
+#' get Cramér-von Mises (`cvm_p`), which tests their empirical distribution
+#' directly. Binned distances have no such distribution, and get a chi-square
+#' over the survey's own bins (`chisq_p`) — without which a binned sweep would
+#' carry no goodness-of-fit at all. `chisq_p` is filled in for exact fits too,
+#' but over cutpoints `mrds` chooses; a test whose result moves with an
+#' arbitrary binning is the weaker one, and `cvm_p` is what to read there. Both
+#' columns are named for their test, so a p-value is never read without knowing
+#' where it came from, and [print()] shows the one that applies.
+#'
+#' A chi-square over few bins runs out of degrees of freedom quickly — three
+#' bins and a two-parameter key leave none — and `mrds` returns `NA` rather
+#' than a p-value when it does. That is a converged model with no goodness-of-fit
+#' test available, not a failed one.
 #'
 #' @section Binned and exact distances cannot be swept together:
 #' `STRIP`-derived distances are intervals and are fitted binned; angle- and
@@ -133,7 +148,10 @@ sweep_models <- function(data, models = NULL, truncation, left = NULL,
         sub("\n.*", "", conditionMessage(attr(fit, "condition"))),
         models$model_id[i]
       ))
-      fits[[i]] <- NULL
+      # `fits[[i]] <- NULL` would delete the element rather than empty it,
+      # shortening the list and sliding every later model onto the wrong row of
+      # the selection table.
+      fits[i] <- list(NULL)
     } else {
       fits[[i]] <- fit
     }
@@ -162,7 +180,8 @@ sweep_models <- function(data, models = NULL, truncation, left = NULL,
 #'
 #' @return A tibble, sorted by AIC, with `model_id`, `key`, `adjustment`,
 #'   `order`, `formula`, `converged`, `n_par`, `aic`, `delta_aic`, `p`, `p_se`,
-#'   `p_cv`, `esw`, and `cvm_p`.
+#'   `p_cv`, `esw`, and a goodness-of-fit p-value in `cvm_p` (exact distances)
+#'   or `chisq_p` (binned).
 #'
 #' @seealso [sweep_models()]
 #'
@@ -188,20 +207,26 @@ build_selection_table <- function(models, fits) {
     what(f)
   }
 
-  aic <- vapply(fits, function(f) if (is.null(f)) NA_real_ else f$criterion,
-                numeric(1))
+  # `fits` is named by model_id, and vapply() carries those names onto every
+  # column. A named column is a nuisance the moment anyone pulls one out, so
+  # they are dropped here rather than at each use.
+  aic <- unname(vapply(fits, function(f) if (is.null(f)) NA_real_
+                       else f$criterion, numeric(1)))
   stats_list <- lapply(fits, fit_summary)
+  stat <- function(what) unname(vapply(stats_list, function(s) s[[what]],
+                                       numeric(1)))
 
   out <- models[, c("model_id", "key", "adjustment", "order", "formula")]
-  out$converged <- !vapply(fits, is.null, logical(1))
-  out$n_par <- vapply(stats_list, function(s) s$n_par, numeric(1))
+  out$converged <- unname(!vapply(fits, is.null, logical(1)))
+  out$n_par <- stat("n_par")
   out$aic <- aic
   out$delta_aic <- aic - min(aic, na.rm = TRUE)
-  out$p <- vapply(stats_list, function(s) s$p, numeric(1))
-  out$p_se <- vapply(stats_list, function(s) s$p_se, numeric(1))
+  out$p <- stat("p")
+  out$p_se <- stat("p_se")
   out$p_cv <- out$p_se / out$p
-  out$esw <- vapply(stats_list, function(s) s$esw, numeric(1))
-  out$cvm_p <- vapply(stats_list, function(s) s$cvm_p, numeric(1))
+  out$esw <- stat("esw")
+  out$cvm_p <- stat("cvm_p")
+  out$chisq_p <- stat("chisq_p")
 
   out[order(out$aic, na.last = TRUE), , drop = FALSE]
 }
@@ -209,16 +234,13 @@ build_selection_table <- function(models, fits) {
 # What a fitted ddf gives back, in one shape. NA all through when it failed.
 fit_summary <- function(f) {
   blank <- list(n_par = NA_real_, p = NA_real_, p_se = NA_real_,
-                esw = NA_real_, cvm_p = NA_real_)
+                esw = NA_real_, cvm_p = NA_real_, chisq_p = NA_real_)
   if (is.null(f)) return(blank)
 
   s <- try(summary(f), silent = TRUE)
   if (inherits(s, "try-error")) return(blank)
 
-  # Cramer-von Mises: the null is that the fitted function describes the
-  # observed distances, so a small p-value is evidence against the model.
-  cvm <- try(mrds::ddf.gof(f, qq = FALSE)$dsgof$CvM$p, silent = TRUE)
-  if (inherits(cvm, "try-error") || is.null(cvm)) cvm <- NA_real_
+  gof <- fit_gof(f)
 
   list(
     n_par = length(f$par),
@@ -228,8 +250,35 @@ fit_summary <- function(f) {
     # the same number of detections under certain detection. This is what
     # propagates into density, which is why it sits next to the AIC.
     esw = s$average.p * s$width,
-    cvm_p = as.numeric(cvm)
+    cvm_p = gof$cvm_p,
+    chisq_p = gof$chisq_p
   )
+}
+
+# Goodness of fit, in whichever forms the fit admits. For both tests the null is
+# that the fitted function describes the observed distances, so a small p-value
+# is evidence against the model.
+#
+# Cramer-von Mises is a test on the empirical distribution of exact distances,
+# and `mrds` does not compute it for a binned fit, which has no such
+# distribution. Chi-square is always available, but for exact distances it is
+# computed over cutpoints `mrds` chooses rather than over bins the survey
+# defined, and a test whose result moves with an arbitrary binning is the
+# weaker of the two. So: CvM where there is one, chi-square where there is not,
+# both carried under their own names so a p-value is never read without
+# knowing which test produced it.
+fit_gof <- function(f) {
+  out <- list(cvm_p = NA_real_, chisq_p = NA_real_)
+  g <- try(mrds::ddf.gof(f, qq = FALSE), silent = TRUE)
+  if (inherits(g, "try-error")) return(out)
+
+  cvm <- g$dsgof$CvM$p
+  if (!is.null(cvm)) out$cvm_p <- as.numeric(cvm)
+
+  chisq <- g$chisquare$chi1$p
+  if (!is.null(chisq)) out$chisq_p <- as.numeric(chisq)
+
+  out
 }
 
 report_sweep <- function(x) {

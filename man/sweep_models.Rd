@@ -61,10 +61,25 @@ the difference goes straight into density. The table therefore carries \code{p}
 alongside the AIC, and \code{\link[=selection_table]{selection_table()}} sorts on AIC only because
 something has to be first.
 
-A goodness-of-fit statistic is reported too: Cramér-von Mises, whose null is
-that the fitted function describes the observed distances. A small p-value is
-evidence against the model, and a model can be top of the AIC ranking and
-still fail it.
+A goodness-of-fit statistic is reported too, whose null is that the fitted
+function describes the observed distances. A small p-value is evidence
+against the model, and a model can be top of the AIC ranking and still fail
+it.
+
+Which test to read follows the data rather than a preference. Exact distances
+get Cramér-von Mises (\code{cvm_p}), which tests their empirical distribution
+directly. Binned distances have no such distribution, and get a chi-square
+over the survey's own bins (\code{chisq_p}) — without which a binned sweep would
+carry no goodness-of-fit at all. \code{chisq_p} is filled in for exact fits too,
+but over cutpoints \code{mrds} chooses; a test whose result moves with an
+arbitrary binning is the weaker one, and \code{cvm_p} is what to read there. Both
+columns are named for their test, so a p-value is never read without knowing
+where it came from, and \code{\link[=print]{print()}} shows the one that applies.
+
+A chi-square over few bins runs out of degrees of freedom quickly — three
+bins and a two-parameter key leave none — and \code{mrds} returns \code{NA} rather
+than a p-value when it does. That is a converged model with no goodness-of-fit
+test available, not a failed one.
 }
 
 \section{Binned and exact distances cannot be swept together}{
