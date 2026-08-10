@@ -61,6 +61,39 @@ First skeleton. The detection-function half of the fitting layer described in
 * Numeric columns of the selection table are no longer named after the models,
   so pulling one out gives a bare vector.
 
+## The g(0) correction slot
+
+* `g0()` assembles a correction from its named components, multiplies them,
+  and propagates their variance. It **builds an object and hands it off**
+  rather than applying anything: this package fits detection functions and
+  does not compute abundance, so the correction belongs one layer out.
+
+  What it can do from here is make the correction impossible to get wrong
+  quietly. The three rules from `docs/01-plan.md` are now enforced rather than
+  described:
+
+  * **Never silently 1.** There is no default, and an absent component is
+    named in a warning and again in the object's own printout — `assumed 1:
+    perception` sits above the table every time it is printed.
+  * **Propagate the variance or refuse.** A component without a standard error
+    is an error. This meets `availability()`'s refusal to invent one, so the
+    two rules close the loop: it will not make up a precision, and this will
+    not accept none.
+  * **Name the components separately**, so it stays visible which have been
+    applied. An unnamed component is an error.
+
+* Components combine multiplicatively and independently — availability comes
+  from dive data, perception from a double-observer trial, so they are
+  separate studies. Under independence the delta method gives the rule worth
+  remembering: **squared CVs add**, `CV(g0)² = Σ CV(xᵢ)²`. The least precise
+  component sets the floor, and a perception estimate with a 30% CV cannot be
+  rescued by an availability estimate with a 2% one.
+
+* Components keyed on **different things are refused rather than joined**.
+  Availability by month and perception by year is the usual way to arrive
+  there, and it has no correct join — the answer is a value per month-year.
+  Pairing January with 1998 because both come first would be silent nonsense.
+
 ## Availability
 
 * `availability()` — the availability component of `g(0)`, computed from mean

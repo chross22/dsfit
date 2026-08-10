@@ -107,11 +107,27 @@ class of error this layer exists to catch.
 
 In the order it is worth doing.
 
-1. **The `g(0)` correction slot.** `availability()` is built — the first of the
-   three components, and the one the literature settles most clearly. What
-   remains is the slot it feeds: a **keyed table**, not a value, with rows of
-   `component` × `value` × `se`, multiplied together and the variance
+1. **The `g(0)` correction slot** — built. `availability()` computes the first
+   component and `g0()` assembles them: a **keyed table**, not a value, with
+   rows of `component` × `value` × `se`, multiplied together and the variance
    propagated by delta method.
+
+   `g0()` builds an object and hands it off rather than applying anything,
+   because this package fits detection functions and does not compute
+   abundance — the correction belongs one layer out. What it can do from here
+   is make the correction impossible to get wrong quietly: it cannot be built
+   without named components, cannot be built without standard errors, and
+   names any absent component in a warning and again in its own printout.
+
+   Under independence the delta method gives the rule worth remembering:
+   squared CVs add, `CV(g0)² = Σ CV(xᵢ)²`, so the least precise component sets
+   the floor. Components keyed on different things — availability by month,
+   perception by year — are refused rather than joined, because the honest
+   answer there is a value per month-year.
+
+   What is left is **perception**, which needs either a double-observer trial
+   (item 2) or values from the literature. `docs/01-plan.md`'s own rules are
+   now enforced in code rather than described here.
 
    Keyed, because a scalar is the error. Ganley et al. (2019) measured right
    whale availability varying by month between 0.27 and 0.85, and perception
@@ -121,16 +137,16 @@ In the order it is worth doing.
    of conditions, and using it as `g(0)` understates the correction by more than
    a factor of two when availability is ~0.5 and perception ~0.7.
 
-   The three rules stand: no default and never silently 1; propagate the
+   The three rules are enforced: no default and never silently 1; propagate the
    variance or refuse the correction, since its CV routinely dominates the CV of
    abundance; and name availability and perception separately, so it is visible
    which have been applied. See section 5 of the architecture document for why
    it cannot be estimated from a NARWC extract.
 
-   Ganley's monthly table is worth shipping as **example data, not as a
-   default** — it is Cape Cod Bay 1998–2017, driven by copepod depth in that
-   specific bay. As a worked example it shows the shape of the input; as a
-   default it would be the same mistake with more decimal places.
+   Ganley's measurements ship as `ganley_surface_time` — **cited data, not a
+   default**. It is Cape Cod Bay 1998–2017, driven by copepod depth in that
+   specific bay; as a worked example it shows the shape of the input, and as a
+   default it would be the same mistake with better provenance.
 2. **An MRDS backend**, conditional on data that actually carries double-observer
    structure — with a guard that errors when it does not, rather than fitting a
    single-observer model and reporting it as though perception bias were

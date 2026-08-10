@@ -271,6 +271,65 @@ The package's own test suite reconciles against the published result: January's
 dive time at about 6.1 minutes, inside the 1.30–8.83 min range the paper
 reports for monthly mean dive times.
 
+## Assembling a g(0) correction
+
+`g0()` stacks the components, multiplies them, and propagates their variance:
+
+```r
+g0(avail, perception)
+#> <dsfit_g0>
+#>   components:  availability, perception
+#>
+#>  key     g0     se    cv
+#>  Dec 0.2814 0.0505 0.180
+#>  Jan 0.3132 0.0545 0.174
+#>  Feb 0.3668 0.0610 0.166
+#>  Mar 0.4445 0.0690 0.155
+#>  Apr 0.5679 0.0798 0.140
+#>  May 0.6466 0.0866 0.134
+#>
+#>   Divide abundance by g0, and propagate cv. This package does not
+#>   apply it: correction happens at the abundance step.
+```
+
+It **builds an object and hands it off** rather than applying anything. This
+package fits detection functions; it does not compute abundance, and the
+correction belongs one layer out where density is calculated. What it can do
+from here is make the correction impossible to get wrong quietly:
+
+- **Never silently 1.** No default, and an absent component is named — in a
+  warning when you build it, and again every time the object prints:
+
+  ```
+  <dsfit_g0>
+    components:  availability
+    assumed 1:   perception
+  ```
+
+- **Propagate the variance or refuse.** A component without a standard error is
+  an error. That meets `availability()`'s refusal to invent one, so the two
+  rules close the loop: it will not make up a precision, and this will not
+  accept none.
+- **Name the components separately**, so it stays visible which have been
+  applied. An unnamed component is an error.
+
+Components combine multiplicatively and independently, which gives a rule worth
+remembering — **squared CVs add**:
+
+```
+  CV(g0)² = Σ CV(xᵢ)²
+```
+
+So the least precise component sets the floor. A perception estimate with a 30%
+CV cannot be rescued by an availability estimate with a 2% one, and the table
+above shows why the `cv` column deserves as much attention as `g0`.
+
+One refusal worth knowing: components keyed on **different things** are rejected
+rather than joined. Availability by month and perception by year is the usual
+way to get there, and it has no correct join — the answer is a value per
+month-year, so build that cross product and key both components on it. Pairing
+January with 1998 because both come first would be silent nonsense.
+
 ## What it will not do
 
 Estimate `g(0)`. Every fit here conditions on the animal having been available
@@ -278,6 +337,10 @@ and seen, and a mis-specified `g(0)` shifts every candidate in a set by the same
 factor — the ranking looks untouched while the density is wrong. It cannot be
 estimated from a standard NARWC extract, which records neither dive data nor the
 double-observer structure mark-recapture needs.
+
+Nor does it **apply** the correction `g0()` builds. Dividing abundance by g(0)
+and carrying its CV through happens at the abundance step, in the analysis
+layer.
 
 `availability()` is not an exception to this: it is a calculation from external
 dive data, and it covers one of the three components. Perception needs a
