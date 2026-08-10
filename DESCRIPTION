@@ -1,0 +1,34 @@
+Package: dsfit
+Title: Fit and Compare Detection Functions for Line-Transect Survey Data
+Version: 0.0.0.9000
+Authors@R:
+    person("Camille", "Ross", email = "camille.ross@maine.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-1428-2294"))
+Description: Fits a set of candidate detection functions to line-transect
+    distance data and compares them on the quantities that matter for
+    abundance, not on AIC alone. Models are fitted through 'mrds' so that every
+    candidate comes off the same likelihood machinery and the gamma key function
+    is available alongside half-normal, hazard-rate and uniform. Enforces the
+    conditions under which a comparison is meaningful: truncation must be held
+    constant within a model set, and binned and exact distances cannot be ranked
+    together. Reports effective strip half-width and its coefficient of
+    variation next to each fit, since two models within two AIC of one another
+    can imply materially different abundance. Takes the flatfile produced by
+    'distsamp' or any equivalent table.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Depends:
+    R (>= 4.1)
+Imports:
+    rlang (>= 1.0.0),
+    stats,
+    tibble
+Suggests:
+    ggplot2,
+    mrds,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+URL: https://github.com/chross22/dsfit
+BugReports: https://github.com/chross22/dsfit/issues
+Config/roxygen2/version: 8.1.0

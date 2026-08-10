@@ -1,0 +1,11 @@
+^docs$
+^\.DS_Store$
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.github$
+^LICENSE\.md$
+^.*\.Rcheck$
+^.*\.tar\.gz$
+^\.claude$
+Rplots\.pdf
+^figure$
