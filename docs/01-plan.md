@@ -41,7 +41,7 @@ package does not replace it. Two reasons to go a level down for a sweep:
 ## 3. What is built
 
 `model_set()`, `sweep_models()`, `selection_table()`, `prepare_distance_data()`,
-and a `print()` method. 137 tests, six of them snapshots over the selection
+and a `print()` method. 274 tests, six of them snapshots over the selection
 table.
 
 Left truncation is here too, as `sweep_models(left = )` — the statistically
@@ -103,73 +103,74 @@ from the list of fits rather than emptied, so every model after it inherited the
 previous one's AIC and `esw`. A wrong selection table, silently — which is the
 class of error this layer exists to catch.
 
-## 4. What is not built
+## 4. The `g(0)` correction
+
+### The `g(0)` correction slot — built
+
+`availability()` computes the availability component from dive intervals and
+the platform's time in view, and `g0()` assembles the components: a **keyed
+table**, not a value, with rows of `component` x `value` x `se`, multiplied
+together and the variance propagated by delta method.
+
+Keyed, because a scalar is the error. Ganley et al. (2019) measured right whale
+availability in Cape Cod Bay varying by month from 0.27 in January to 0.91 in
+April; Roberts et al. (2024) correct per platform, team and conditions. A figure
+like 0.83 sits inside that range, which is what makes it dangerous — it is one
+component's value under one set of conditions, and using it as `g(0)`
+understates the correction by more than a factor of two when availability is
+~0.5 and perception ~0.7.
+
+`g0()` builds an object and hands it off rather than applying anything, because
+this package fits detection functions and does not compute abundance — the
+correction belongs one layer out. What it does from here is make the correction
+impossible to get wrong quietly. The three rules are enforced rather than
+described: no default and never silently 1, with any absent component named in
+a warning and again in the printout; propagate the variance or refuse, since
+`g(0)`'s CV routinely dominates the CV of abundance; and name the components
+separately, so it stays visible which have been applied. A component may also
+record a `source`, so a borrowed value cannot pass for a local one.
+
+Under independence the delta method gives the rule worth remembering: squared
+CVs add, `CV(g0)² = Σ CV(xᵢ)²`, so the least precise component sets the floor.
+Components keyed on different things — availability by month, perception by
+year — are refused rather than joined, because the honest answer there is a
+value per month-year.
+
+Ganley's measurements ship as `ganley_availability`, and their annual detection
+functions as `ganley_detection` — **cited data, not defaults**. Note that
+`ganley_detection`'s 0.43–0.87 figures are `p`, the detection function's own
+average probability, which `selection_table()` already reports; they are not
+perception, which Ganley et al. did not estimate.
+
+### Perception, and why there is no estimator here
+
+True double-observer data is not the norm in NARWC datasets. Whether perception
+is estimable is a property of the contributing survey programme rather than of
+the archive — AMAPPS ran two independent teams on both platforms, the Cape Cod
+Bay programme did not — and the programmes that did are the exception. An MRDS
+backend would be a large piece of machinery, needing maintenance against `mrds`
+forever, aimed at a case that mostly does not arrive.
+
+That is not a gap. For nearly every dataset this layer will see, perception has
+two honest treatments and `g0()` implements both: left at 1 with the assumption
+printed, or borrowed from a programme that could measure it, with `source`
+recording that it is on loan. Roberts et al. (2024) took the second route for
+ten of their eleven institutions and said so in print. That is the state of the
+art, not a shortcut around it.
+
+## 5. What is left
 
 In the order it is worth doing.
 
-1. **The `g(0)` correction slot** — built. `availability()` computes the first
-   component and `g0()` assembles them: a **keyed table**, not a value, with
-   rows of `component` × `value` × `se`, multiplied together and the variance
-   propagated by delta method.
+1. **A structure detector.** Read a set of detections and report what it can and
+   cannot support — no double-observer structure, so perception is not
+   estimable; binned distances, so no Cramér-von Mises; and so on. Small, and
+   useful precisely because the answer is nearly always the same and nearly
+   always unwelcome. It moves "you had to know that" into "the package said so".
+2. **The `dsm` handoff**, from `distsamp::segments_as_sf(segs, "midpoints")`.
+3. **A vignette**, once there is something end-to-end to walk through.
 
-   `g0()` builds an object and hands it off rather than applying anything,
-   because this package fits detection functions and does not compute
-   abundance — the correction belongs one layer out. What it can do from here
-   is make the correction impossible to get wrong quietly: it cannot be built
-   without named components, cannot be built without standard errors, and
-   names any absent component in a warning and again in its own printout.
-
-   Under independence the delta method gives the rule worth remembering:
-   squared CVs add, `CV(g0)² = Σ CV(xᵢ)²`, so the least precise component sets
-   the floor. Components keyed on different things — availability by month,
-   perception by year — are refused rather than joined, because the honest
-   answer there is a value per month-year.
-
-   What is left is **perception**, which needs either a double-observer trial
-   (item 2) or values from the literature. `docs/01-plan.md`'s own rules are
-   now enforced in code rather than described here.
-
-   Keyed, because a scalar is the error. Ganley et al. (2019) measured right
-   whale availability varying by month from 0.27 in January to 0.91 in April;
-   Roberts et al. (2024) correct per platform, team and conditions. A figure
-   like 0.83 sits inside that range, which is what makes it dangerous — it is
-   one component's value under one set of conditions, and using it as `g(0)`
-   understates the correction by more than a factor of two when availability is
-   ~0.5 and perception ~0.7.
-
-   Ganley et al. did **not** estimate perception; their annual figures of
-   0.43–0.87 are `p`, the detection function's own average probability, which
-   is what `selection_table()` already reports. Perception needs a second
-   observer team, which is item 2 below and the binding constraint on the whole
-   correction.
-
-   The three rules are enforced: no default and never silently 1; propagate the
-   variance or refuse the correction, since its CV routinely dominates the CV of
-   abundance; and name availability and perception separately, so it is visible
-   which have been applied. See section 5 of the architecture document for why
-   it cannot be estimated from a NARWC extract.
-
-   Ganley's measurements ship as `ganley_surface_time` — **cited data, not a
-   default**. It is Cape Cod Bay 1998–2017, driven by copepod depth in that
-   specific bay; as a worked example it shows the shape of the input, and as a
-   default it would be the same mistake with better provenance.
-2. **An MRDS backend**, conditional on data that actually carries double-observer
-   structure — with a guard that errors when it does not, rather than fitting a
-   single-observer model and reporting it as though perception bias were
-   handled.
-
-   The **guard matters more than the estimator**. Whether perception is
-   estimable is a property of the contributing survey programme, not of NARWC:
-   AMAPPS ran two independent teams on both platforms, and the Cape Cod Bay
-   programme Ganley et al. worked on did not. Since an extract does not announce
-   which it is, the code has to detect the structure rather than assume it.
-   Where it is absent, perception is either left at 1 with the assumption
-   visible or borrowed with its `source` recorded — both of which `g0()` now
-   prints.
-3. **The `dsm` handoff**, from `distsamp::segments_as_sf(segs, "midpoints")`.
-4. **A vignette**, once there is something end-to-end to walk through.
-
-## 5. Deliberately out of scope
+## 6. Deliberately out of scope
 
 **Estimating `g(0)`.** Not a gap to be filled later — it cannot be estimated
 from the data this layer receives. Three distinct things present as `g(0) < 1`:
