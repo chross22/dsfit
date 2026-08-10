@@ -61,6 +61,34 @@ First skeleton. The detection-function half of the fitting layer described in
 * Numeric columns of the selection table are no longer named after the models,
   so pulling one out gives a bare vector.
 
+## Saying what the data can support
+
+* `detection_structure()` reads a table of detections and reports which
+  analyses it admits, with the reason, before anything is fitted. Verdicts are
+  `can`, `cannot`, and `partly`.
+
+  Most of what decides whether an analysis is possible is structural and none
+  of it is announced by the data. Whether a survey ran two independent observer
+  teams decides whether perception bias is estimable at all — and that is a
+  property of the survey programme rather than of the archive its data lands
+  in, so a pooled extract may or may not carry it.
+
+  The failure it guards against is a silence rather than an error: fitting a
+  single-observer dataset and reporting it as though perception had been
+  handled. That produces a number, and the number is wrong by a factor.
+
+* `partly` exists for the shape that most invites the mistake — an `observer`
+  column with no `detected` indicator, which looks like double-observer data
+  and is not. Two observers who never share a sighting get the same verdict:
+  nothing to mark and recapture.
+
+* Availability is reported unsupported for every table, which is not a defect
+  in any dataset. It is not estimable from distances by construction, since a
+  submerged animal is missed at every distance equally — see `availability()`.
+
+* It reports; `prepare_distance_data()` enforces. One is a briefing, the other
+  is a gate, and there is a test asserting they disagree in exactly that way.
+
 ## The g(0) correction slot
 
 * `g0()` assembles a correction from its named components, multiplies them,

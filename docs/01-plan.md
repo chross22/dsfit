@@ -13,8 +13,17 @@ That document is the reasoning; this one is the state.
 | Layer | Holds | Form |
 |---|---|---|
 | `distsamp` | NARWC ingest, effort, segmentation, right-angle distances | package |
-| **`dsfit`** | the model-selection sweep, gamma support, GOF and `p̄`, `g(0)`, the `dsm` handoff | **package** |
+| **`dsfit`** | the model-selection sweep, gamma support, GOF and `p̄`, `g(0)` | **package** |
+| DSM layer | covariates, density surface models, the `dsm` handoff | separate package |
 | analysis repo | which years, which truncation, which covariates, the report | `targets` + `renv` |
+
+The `dsm` handoff was listed here until it was looked at properly. It needs both
+`distsamp`'s segment structures and `dsm`'s, and this package depends on
+neither; the covariate stack behind a density surface model is heavy (`terra`,
+`ncdf4`, `marmap`), which is the same argument `distsamp`'s next-steps already
+makes for covariates and DSMs being their own package. Building an adapter here
+would drag two dependency trees in for one function. `dsfit` stops at the
+detection function and what it implies.
 
 The middle layer is a package rather than scripts because it is the part with
 logic that needs tests. An automated comparison over detection-function
@@ -162,13 +171,15 @@ art, not a shortcut around it.
 
 In the order it is worth doing.
 
-1. **A structure detector.** Read a set of detections and report what it can and
-   cannot support — no double-observer structure, so perception is not
-   estimable; binned distances, so no Cramér-von Mises; and so on. Small, and
-   useful precisely because the answer is nearly always the same and nearly
-   always unwelcome. It moves "you had to know that" into "the package said so".
-2. **The `dsm` handoff**, from `distsamp::segments_as_sf(segs, "midpoints")`.
-3. **A vignette**, once there is something end-to-end to walk through.
+1. ~~**A structure detector.**~~ Built, as `detection_structure()`: it reads a
+   set of detections and reports what they can and cannot support, with the
+   reason. Three verdicts, `can`, `cannot` and `partly` — the last for an
+   `observer` column with no `detected` indicator, which looks like
+   double-observer data and is not. It reports; `prepare_distance_data()`
+   enforces.
+2. **A vignette**, once there is something end-to-end to walk through.
+
+The **`dsm` handoff** has moved out of this package — see section 1.
 
 ## 6. Deliberately out of scope
 

@@ -289,6 +289,45 @@ is an inviting mistake:
   Neither matches the error bars in the paper's own figure, so it ships
   unconverted under the paper's label and `g0()` makes you decide.
 
+## What your data can and cannot support
+
+`detection_structure()` reads a table of detections and reports which analyses
+it admits — before anything is fitted:
+
+```r
+detection_structure(detections)
+#> <dsfit_structure>
+#>   200 rows, 200 exact distances
+#>   nearest detection at 0.1326 - a blind spot beneath the platform would show here
+#>
+#>   can:
+#>     fit a detection function        200 exact distances; at or above the 60-80 usually suggested
+#>     test fit with Cramer-von Mises  exact distances have an empirical distribution to test
+#>     fit covariate models            candidates: beaufort
+#>
+#>   cannot:
+#>     estimate perception bias  no double-observer structure: no `observer` or
+#>                               `detected` column. Perception needs two independent
+#>                               teams and cannot be recovered from a single-observer
+#>                               survey at any sample size
+#>     estimate availability     not estimable from distances by construction...
+```
+
+Most of what decides whether an analysis is possible is structural, and none of
+it is announced by the data. Whether a survey ran two independent observer teams
+decides whether perception bias is estimable at all — and that is a property of
+the **survey programme**, not of the archive its data ends up in, so a pooled
+extract may or may not carry it.
+
+The failure this guards against is not an error but a silence: fitting a
+single-observer dataset and reporting it as though perception had been handled.
+That produces a number, and the number is wrong by a factor. A third verdict,
+`partly`, catches the shape that most invites the mistake — an `observer` column
+with no `detected` indicator, which looks like double-observer data and is not.
+
+It reports; [`prepare_distance_data()`](R/prepare.R) enforces. One is a briefing,
+the other is a gate.
+
 ## Assembling a g(0) correction
 
 `g0()` stacks the components, multiplies them, and propagates their variance:
