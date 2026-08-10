@@ -72,6 +72,25 @@ beneath it. But a gamma key and a **left truncation model the same phenomenon**,
 so applying both accounts for the blind spot twice. `sweep_models()` warns when
 you do.
 
+## Plotting
+
+`effect_estimates.ddf()` makes a fitted detection function plottable with
+[fancyfx](https://github.com/chross22/fancyfx):
+
+```r
+fancyfx::plotEffects(sw$fits[["hn"]], dat = detections, var = "distance")
+```
+
+which gives the fitted g(x) with a delta-method ribbon and a rug of the observed
+distances above it — the standard detection-function diagnostic, and fancyfx's
+premise applied almost exactly. `fancyfx` is a `Suggests`, so it is optional.
+
+One thing worth knowing: for a **covariate** model the area under that curve is
+not the `esw` in the selection table. `mrds` computes `average.p` as a
+Horvitz-Thompson mean, weighting each animal by the inverse of its own detection
+probability; the plotted curve is the plain mean over the animals as observed.
+They coincide only when detection probability is constant.
+
 ## What it will not do
 
 Estimate `g(0)`. Every fit here conditions on the animal having been available
