@@ -2,8 +2,10 @@
 
 S3method(fancyfx::effect_estimates,ddf)
 S3method(print,dsfit_sweep)
+export(availability)
 export(effect_estimates_ddf)
 export(model_set)
 export(prepare_distance_data)
 export(selection_table)
 export(sweep_models)
+export(view_window)

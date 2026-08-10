@@ -9,3 +9,4 @@
 ^\.claude$
 Rplots\.pdf
 ^figure$
+^data-raw$

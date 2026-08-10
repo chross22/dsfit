@@ -61,6 +61,41 @@ First skeleton. The detection-function half of the fitting layer described in
 * Numeric columns of the selection table are no longer named after the models,
   so pulling one out gives a bare vector.
 
+## Availability
+
+* `availability()` and `view_window()` — the availability component of `g(0)`,
+  computed from mean surfacing and diving intervals and the time the platform
+  keeps an animal in view, following Laake and Borchers (2004). It returns a
+  `key` / `component` / `value` / `se` table, which is the shape a `g(0)`
+  correction stacks from.
+
+  It **computes** rather than estimates, and the distinction is the whole
+  point. An animal submerged while the aircraft passes is missed at every
+  perpendicular distance equally, so to first order availability is a pure
+  scale factor on g(x) — no dent in the near-zero end, no change in shape,
+  nothing for a likelihood to find. None of the inputs come from the survey
+  being corrected.
+
+* Why it is a function rather than a constant: Ganley et al. (2019) measured
+  right whale availability in Cape Cod Bay and found it varying by month
+  between **0.27 and 0.85**, with perception varying separately by year
+  between 0.43 and 0.87. Roberts et al. (2024) correct per platform, team and
+  conditions across 11 institutions. A single representative figure is a real
+  number for one month and wrong by a factor of two for others — and because
+  it scales every candidate equally, model selection never reveals it.
+
+* Standard errors propagate by delta method from `se_surface` and `se_dive`,
+  numerically as in `effect_estimates_ddf()`. Supplying one without the other
+  is an error rather than a half-propagated variance, and supplying neither
+  gives `se = NA` rather than an invented precision.
+
+* `example_dive_intervals`, a six-month table of surfacing and diving
+  intervals. **The numbers are invented** — they are not measurements and not
+  Ganley's Cape Cod Bay values, which are not open access. What is real is the
+  pattern: dive times falling and surface times rising through the season as
+  the food moves up, which puts `availability()` over them between about 0.25
+  and 0.85. Shipped so the worked example shows why a constant will not do.
+
 ## What it refuses, and why
 
 * **Point and interval distances in one sweep.** Binned and exact fits have
