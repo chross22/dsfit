@@ -1,5 +1,10 @@
 # dsfit
 
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/chross22/dsfit/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/chross22/dsfit/actions/workflows/R-CMD-check.yaml)
+[![check-citations](https://github.com/chross22/dsfit/actions/workflows/check-citations.yaml/badge.svg)](https://github.com/chross22/dsfit/actions/workflows/check-citations.yaml)
+<!-- badges: end -->
+
 Fit and compare detection functions for line-transect distance sampling — and
 compare them on the quantities that decide abundance, not on AIC alone.
 

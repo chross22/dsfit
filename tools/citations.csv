@@ -1,0 +1,6 @@
+key,doi,url,first_author,year,title,container,volume,pages,checks,note
+miller2019,10.18637/jss.v089.i01,,Miller,2019,Distance sampling in R,Journal of Statistical Software,89,1-28,crossref,The Distance and mrds toolchain this package fits through
+becker2009,10.1198/jabes.2009.0013,,Becker,2009,A gamma-shaped detection function for line-transect surveys with mark-recapture and covariate data,Journal of Agricultural Biological and Environmental Statistics,14,207-223,crossref,The gamma key function - unimodal with its peak away from zero
+buckland2001,,,Buckland,2001,Introduction to Distance Sampling: Estimating Abundance of Biological Populations,Oxford University Press,,,none,Standard line-transect reference. Book; no DOI.
+laake2004,,,Laake,2004,Methods for incomplete detection at distance zero,Advanced Distance Sampling,,108-189,none,Why g(0) is not estimable from single-observer data. Book chapter.
+marques2004,,,Marques,2004,Covariate models for the detection function,Advanced Distance Sampling,,31-47,none,Covariate detection functions; cited by mrds for its key functions. Book chapter.

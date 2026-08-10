@@ -52,6 +52,12 @@
 #' Laake, J.L. and Borchers, D.L. (2004) Methods for incomplete detection at
 #' distance zero. In *Advanced Distance Sampling*, Oxford University Press.
 #'
+#' Becker, E.A. and Quang, P.X. (2009) A gamma-shaped detection function for
+#' line-transect surveys with mark-recapture and covariate data. *Journal of
+#' Agricultural, Biological and Environmental Statistics* 14:207-223.
+#' \doi{10.1198/jabes.2009.0013} The gamma key function, and the aerial-survey
+#' case it was developed for.
+#'
 #' @seealso [sweep_models()]
 #'
 #' @examples
