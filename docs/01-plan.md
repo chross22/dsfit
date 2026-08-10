@@ -177,9 +177,20 @@ In the order it is worth doing.
    `observer` column with no `detected` indicator, which looks like
    double-observer data and is not. It reports; `prepare_distance_data()`
    enforces.
-2. **A vignette**, once there is something end-to-end to walk through.
+2. ~~**A vignette.**~~ Built, as `vignettes/dsfit.Rmd`: one simulated aerial
+   survey walked from a table of distances to a `g(0)` correction.
+
+   Its spine is a live demonstration rather than an assertion. The survey has a
+   blind spot beneath the aircraft, so the first sweep's AIC winner **fails
+   goodness-of-fit, along with every other candidate** — because no key function
+   reproduces a hard geometric cutoff. Left truncating fixes it, and the point
+   lands on its own: the fix was a statement about the aircraft, not a better
+   model, and the AIC column had no way to say so.
 
 The **`dsm` handoff** has moved out of this package — see section 1.
+
+Nothing else is planned. What would come next is use: running this against a
+real NARWC extract and finding out which of its guards fire.
 
 ## 6. Deliberately out of scope
 

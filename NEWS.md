@@ -61,6 +61,18 @@ First skeleton. The detection-function half of the fitting layer described in
 * Numeric columns of the selection table are no longer named after the models,
   so pulling one out gives a bare vector.
 
+## A vignette
+
+* `vignette("dsfit")` walks one simulated aerial survey from a table of
+  distances to a `g(0)` correction.
+
+  Its spine is a demonstration rather than an assertion. The survey has a blind
+  spot beneath the aircraft, so the first sweep's AIC winner **fails
+  goodness-of-fit — along with every other candidate**, because no key function
+  reproduces a hard geometric cutoff. Left truncating fixes it, and the lesson
+  lands on its own: the fix was a statement about the aircraft rather than a
+  better model, and nothing in the AIC column could have said so.
+
 ## Saying what the data can support
 
 * `detection_structure()` reads a table of detections and reports which

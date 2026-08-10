@@ -13,10 +13,14 @@ Takes the flatfile produced by [`distsamp`](https://github.com/chross22/distsamp
 `mrds`, and returns a selection table carrying effective strip half-width and its
 CV alongside each AIC.
 
-> **Status: skeleton.** The model set, the sweep, the input guards, and
-> snapshot regression tests pinning the selection are built and tested. The
-> `g(0)` correction slot and the `dsm` handoff are not yet written. See
-> [docs/01-plan.md](docs/01-plan.md).
+> **Status: complete in scope.** The model set, the sweep, the input guards,
+> snapshot regression tests pinning the selection, the `g(0)` correction slot
+> and a vignette are built and tested. Density surface models live in their own
+> package. See [docs/01-plan.md](docs/01-plan.md).
+
+```r
+vignette("dsfit")
+```
 
 ## Install
 
