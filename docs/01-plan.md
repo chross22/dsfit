@@ -157,6 +157,15 @@ In the order it is worth doing.
    structure — with a guard that errors when it does not, rather than fitting a
    single-observer model and reporting it as though perception bias were
    handled.
+
+   The **guard matters more than the estimator**. Whether perception is
+   estimable is a property of the contributing survey programme, not of NARWC:
+   AMAPPS ran two independent teams on both platforms, and the Cape Cod Bay
+   programme Ganley et al. worked on did not. Since an extract does not announce
+   which it is, the code has to detect the structure rather than assume it.
+   Where it is absent, perception is either left at 1 with the assumption
+   visible or borrowed with its `source` recorded — both of which `g0()` now
+   prints.
 3. **The `dsm` handoff**, from `distsamp::segments_as_sf(segs, "midpoints")`.
 4. **A vignette**, once there is something end-to-end to walk through.
 

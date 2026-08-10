@@ -58,12 +58,31 @@
 #' 1998 because both are first in their vectors is exactly the failure this
 #' refuses to commit.
 #'
+#' @section Recording where a component came from:
+#' Components may carry an optional `source` column, and it is worth using.
+#'
+#' Perception is the reason. Estimating it needs two independent observer teams,
+#' and whether a survey programme ran them is a property of that programme
+#' rather than of the archive its data ends up in. A NARWC extract may or may
+#' not carry the structure, so for many datasets the only available perception
+#' estimate is one **borrowed from a different programme**. Roberts et al.
+#' (2024) did exactly this — perception was estimable only from NOAA's AMAPPS
+#' surveys, and they applied those corrections to the other ten institutions'
+#' data, cautioning in print that it could have biased their density estimates.
+#'
+#' A borrowed correction that looks local is the failure this guards against. So
+#' `source` travels with the component into the object and is printed every
+#' time, and a component with none is shown as `source not recorded` rather than
+#' silently blank.
+#'
 #' @param ... One or more component tables, each with `key`, `component`,
-#'   `value` and `se` columns. [availability()] returns this shape.
+#'   `value` and `se` columns, and optionally `source`. [availability()] returns
+#'   this shape.
 #'
 #' @return An object of class `dsfit_g0`: a list with `table` (one row per key,
 #'   carrying `value`, `se` and `cv`) and `components` (the rows it was built
-#'   from, kept so the correction can always be taken apart again).
+#'   from, `source` included, kept so the correction can always be taken apart
+#'   again).
 #'
 #' @references
 #' Laake, J.L. and Borchers, D.L. (2004) Methods for incomplete detection at
@@ -76,11 +95,18 @@
 #' @examples
 #' avail <- availability(surface = 60, dive = 240, window = 24,
 #'                       se_surface = 8, se_dive = 25)
+#' avail$source <- "focal follows, this survey"
 #'
-#' perception <- data.frame(key = NA_character_, component = "perception",
-#'                          value = 0.68, se = 0.09)
+#' # A perception estimate that is not this survey's, said so
+#' perception <- data.frame(
+#'   key = NA_character_, component = "perception", value = 0.68, se = 0.09,
+#'   source = "AMAPPS double-observer, borrowed - not measured on this survey"
+#' )
 #'
 #' g0(avail, perception)
+#'
+#' # Without perception at all, which is said too
+#' suppressWarnings(g0(avail))
 #'
 #' @export
 g0 <- function(...) {
@@ -108,7 +134,10 @@ g0 <- function(...) {
         "Component ", i, " is missing: ", paste(missing, collapse = ", "), "."
       ))
     }
-    p <- p[, cols, drop = FALSE]
+    # `source` is optional, and absent means unrecorded rather than local.
+    p$source <- if ("source" %in% names(p)) as.character(p$source) else
+      NA_character_
+    p <- p[, c(cols, "source"), drop = FALSE]
     p$key <- if (all(is.na(p$key))) NA_character_ else as.character(p$key)
     p$component <- as.character(p$component)
     p
@@ -212,13 +241,25 @@ g0 <- function(...) {
 #' @export
 print.dsfit_g0 <- function(x, ...) {
   cat("<dsfit_g0>\n")
-  cat("  components:  ", paste(unique(x$components$component), collapse = ", "),
-      "\n", sep = "")
 
   missing <- setdiff(c("availability", "perception"),
                      unique(x$components$component))
   if (length(missing)) {
     cat("  assumed 1:   ", paste(missing, collapse = ", "), "\n", sep = "")
+  }
+
+  # Where each component came from. Printed every time, with anything
+  # unrecorded said so, because a borrowed correction that looks local is the
+  # mistake this is here to prevent.
+  named <- unique(x$components$component)
+  width <- max(nchar(named))
+  cat("  components:\n")
+  for (nm in named) {
+    src <- unique(x$components$source[x$components$component == nm])
+    src <- src[!is.na(src)]
+    label <- if (!length(src)) "source not recorded" else
+      paste(src, collapse = "; ")
+    cat("    ", formatC(nm, width = -width), "  ", label, "\n", sep = "")
   }
 
   tab <- x$table

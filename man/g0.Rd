@@ -8,12 +8,14 @@ g0(...)
 }
 \arguments{
 \item{...}{One or more component tables, each with \code{key}, \code{component},
-\code{value} and \code{se} columns. \code{\link[=availability]{availability()}} returns this shape.}
+\code{value} and \code{se} columns, and optionally \code{source}. \code{\link[=availability]{availability()}} returns
+this shape.}
 }
 \value{
 An object of class \code{dsfit_g0}: a list with \code{table} (one row per key,
 carrying \code{value}, \code{se} and \code{cv}) and \code{components} (the rows it was built
-from, kept so the correction can always be taken apart again).
+from, \code{source} included, kept so the correction can always be taken apart
+again).
 }
 \description{
 Stacks the components of \code{g(0)} — availability, perception, anything else
@@ -82,14 +84,40 @@ the cross product yourself and keying on it. Silently pairing January with
 refuses to commit.
 }
 
+\section{Recording where a component came from}{
+
+Components may carry an optional \code{source} column, and it is worth using.
+
+Perception is the reason. Estimating it needs two independent observer teams,
+and whether a survey programme ran them is a property of that programme
+rather than of the archive its data ends up in. A NARWC extract may or may
+not carry the structure, so for many datasets the only available perception
+estimate is one \strong{borrowed from a different programme}. Roberts et al.
+(2024) did exactly this — perception was estimable only from NOAA's AMAPPS
+surveys, and they applied those corrections to the other ten institutions'
+data, cautioning in print that it could have biased their density estimates.
+
+A borrowed correction that looks local is the failure this guards against. So
+\code{source} travels with the component into the object and is printed every
+time, and a component with none is shown as \verb{source not recorded} rather than
+silently blank.
+}
+
 \examples{
 avail <- availability(surface = 60, dive = 240, window = 24,
                       se_surface = 8, se_dive = 25)
+avail$source <- "focal follows, this survey"
 
-perception <- data.frame(key = NA_character_, component = "perception",
-                         value = 0.68, se = 0.09)
+# A perception estimate that is not this survey's, said so
+perception <- data.frame(
+  key = NA_character_, component = "perception", value = 0.68, se = 0.09,
+  source = "AMAPPS double-observer, borrowed - not measured on this survey"
+)
 
 g0(avail, perception)
+
+# Without perception at all, which is said too
+suppressWarnings(g0(avail))
 
 }
 \references{

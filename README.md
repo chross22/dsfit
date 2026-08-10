@@ -331,6 +331,36 @@ from here is make the correction impossible to get wrong quietly:
 - **Name the components separately**, so it stays visible which have been
   applied. An unnamed component is an error.
 
+### Recording where a component came from
+
+Components take an optional `source`, and perception is the reason to use it.
+
+Estimating perception needs two independent observer teams, and whether a survey
+programme ran them is a property of that programme rather than of the archive
+its data lands in. A NARWC extract may or may not carry the structure, so for
+many datasets the only available perception estimate is one **borrowed from a
+different programme**. Roberts et al. did exactly that — perception was
+estimable only from NOAA's AMAPPS surveys, and they applied those corrections to
+the other ten institutions' data, cautioning in print that it may have biased
+their density estimates.
+
+A borrowed correction that looks local is the failure this guards against, so
+`source` is printed every time and anything missing one is named:
+
+```
+<dsfit_g0>
+  components:
+    availability  focal follows, this survey
+    perception    AMAPPS double-observer, borrowed - not measured on this survey
+```
+
+```
+<dsfit_g0>
+  assumed 1:   perception
+  components:
+    availability  source not recorded
+```
+
 Components combine multiplicatively and independently, which gives a rule worth
 remembering — **squared CVs add**:
 

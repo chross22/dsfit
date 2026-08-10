@@ -82,6 +82,16 @@ First skeleton. The detection-function half of the fitting layer described in
   * **Name the components separately**, so it stays visible which have been
     applied. An unnamed component is an error.
 
+* Components carry an optional `source`, printed every time, with anything
+  missing one shown as `source not recorded`. Perception is the reason:
+  estimating it needs two independent observer teams, and whether a programme
+  ran them is a property of that programme rather than of the archive its data
+  lands in. So for many NARWC datasets the only available perception estimate
+  is one **borrowed from a different programme** — which is what Roberts et al.
+  (2024) did for ten of their eleven institutions, cautioning in print that it
+  may have biased their density estimates. A borrowed correction that looks
+  local is the failure this guards against.
+
 * Components combine multiplicatively and independently — availability comes
   from dive data, perception from a double-observer trial, so they are
   separate studies. Under independence the delta method gives the rule worth

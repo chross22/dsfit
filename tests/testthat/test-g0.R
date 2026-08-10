@@ -112,7 +112,8 @@ test_that("printing shows what was applied and what was assumed", {
   out <- paste(utils::capture.output(print(g0(avail(), percep()))),
                collapse = "\n")
   expect_match(out, "dsfit_g0")
-  expect_match(out, "availability, perception")
+  expect_match(out, "availability")
+  expect_match(out, "perception")
   expect_match(out, "abundance step")
 
   # A missing component is visible in the printout, not just at construction.
@@ -120,6 +121,62 @@ test_that("printing shows what was applied and what was assumed", {
     print(suppressWarnings(g0(avail())))
   ), collapse = "\n")
   expect_match(partial, "assumed 1:\\s+perception")
+})
+
+test_that("a borrowed component can say so, and does every time it prints", {
+  # The case this exists for: perception is estimable only where a programme
+  # ran two observer teams, so for many datasets the only available estimate
+  # belongs to a different survey. A borrowed correction that looks local is
+  # the mistake.
+  a <- avail()
+  a$source <- "focal follows, this survey"
+  p <- percep()
+  p$source <- "AMAPPS double-observer, borrowed"
+
+  g <- g0(a, p)
+  expect_equal(g$components$source,
+               c("focal follows, this survey", "AMAPPS double-observer, borrowed"))
+
+  out <- paste(utils::capture.output(print(g)), collapse = "\n")
+  expect_match(out, "borrowed")
+  expect_match(out, "focal follows, this survey")
+})
+
+test_that("an unrecorded source is shown as unrecorded, not left blank", {
+  out <- paste(utils::capture.output(print(g0(avail(), percep()))),
+               collapse = "\n")
+  expect_match(out, "source not recorded")
+})
+
+test_that("source is optional, and mixing recorded with unrecorded works", {
+  a <- avail()
+  a$source <- "focal follows"
+  g <- g0(a, percep())            # perception carries none
+
+  expect_equal(g$components$source, c("focal follows", NA_character_))
+  out <- paste(utils::capture.output(print(g)), collapse = "\n")
+  expect_match(out, "focal follows")
+  expect_match(out, "source not recorded")
+})
+
+test_that("distinct sources across a component's keys are all shown", {
+  months <- c("Jan", "Feb")
+  a <- avail(c(0.3, 0.5), 0.04, key = months)
+  a$source <- c("focal follows 2016", "focal follows 2017")
+
+  out <- paste(utils::capture.output(print(g0(a, percep()))), collapse = "\n")
+  expect_match(out, "focal follows 2016; focal follows 2017")
+})
+
+test_that("adding a source does not change the arithmetic", {
+  plain <- g0(avail(0.5, 0.04), percep(0.7, 0.06))
+  a <- avail(0.5, 0.04); a$source <- "somewhere"
+  p <- percep(0.7, 0.06); p$source <- "elsewhere"
+  sourced <- g0(a, p)
+
+  expect_equal(plain$table$value, sourced$table$value)
+  expect_equal(plain$table$se, sourced$table$se)
+  expect_equal(plain$table$cv, sourced$table$cv)
 })
 
 test_that("availability() feeds g0() directly", {
