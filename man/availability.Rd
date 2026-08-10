@@ -66,9 +66,9 @@ is the point: it is visible rather than absorbed into a constant.
 
 \section{The formula}{
 
-Following Laake and Borchers (2004), for a mean surfacing interval
-\eqn{E(s)}, a mean diving interval \eqn{E(d)}, and a window \eqn{w} during
-which the animal is in view:
+Following Laake et al. (1997), for a mean surfacing interval \eqn{E(s)}, a
+mean diving interval \eqn{E(d)}, and a window \eqn{w} during which the animal
+is in view:
 
 \deqn{a = \frac{E(s) + E(d)\left(1 - e^{-w/E(d)}\right)}{E(s) + E(d)}}
 
@@ -133,9 +133,15 @@ availability(surface = 60, dive = 240, window = 24,
 
 }
 \references{
+Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997) Probability
+of detecting harbor porpoise from aerial surveys: estimating g(0). \emph{The
+Journal of Wildlife Management} 61:63-75. \doi{10.2307/3802415} The formula
+implemented here.
+
 Laake, J.L. and Borchers, D.L. (2004) Methods for incomplete detection at
 distance zero. In \emph{Advanced Distance Sampling}, pp. 108-189. Oxford University
-Press. The formula implemented here.
+Press. Why perception needs a second observer team, and availability needs
+something outside the survey entirely.
 
 Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there
 is: estimating North Atlantic right whale \emph{Eubalaena glacialis} local

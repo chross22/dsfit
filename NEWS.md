@@ -63,11 +63,11 @@ First skeleton. The detection-function half of the fitting layer described in
 
 ## Availability
 
-* `availability()` and `view_window()` — the availability component of `g(0)`,
-  computed from mean surfacing and diving intervals and the time the platform
-  keeps an animal in view, following Laake and Borchers (2004). It returns a
-  `key` / `component` / `value` / `se` table, which is the shape a `g(0)`
-  correction stacks from.
+* `availability()` — the availability component of `g(0)`, computed from mean
+  surfacing and diving intervals and the time the platform keeps an animal in
+  view, following Laake et al. (1997) equation 5. It returns a `key` /
+  `component` / `value` / `se` table, which is the shape a `g(0)` correction
+  stacks from.
 
   It **computes** rather than estimates, and the distinction is the whole
   point. An animal submerged while the aircraft passes is missed at every
@@ -89,12 +89,35 @@ First skeleton. The detection-function half of the fitting layer described in
   is an error rather than a half-propagated variance, and supplying neither
   gives `se = NA` rather than an invented precision.
 
+* `view_window_aerial()`, and a correction. An **aircraft observer's field of
+  view is a wedge running forward and aft**, so an animal further off the
+  trackline stays in it *longer* — Ganley et al. measured time in view rising
+  from about 50 s near the trackline to about 130 s at 3 km. `view_window()`'s
+  circular geometry does the opposite, and using it for an aircraft gets the
+  sign of the distance effect backwards. Both are kept, because both cases
+  exist, but the aerial one is what a line-transect aerial survey wants.
+
+* `ganley_surface_time`: real, cited percent surface time from 87 focal follows
+  of right whales in Cape Cod Bay — 16% in January against 55% in April, as the
+  copepods move up the water column. Percent surface time is the `w → 0` limit
+  of `availability()`, so it is a floor on availability and the seasonal
+  problem in its rawest form.
+
+  It carries only what the paper states in text. The monthly availability
+  figures are in a figure and a supplementary table, and reading bar heights
+  off a chart is not a measurement, so the dataset stops where the text does.
+
 * `example_dive_intervals`, a six-month table of surfacing and diving
-  intervals. **The numbers are invented** — they are not measurements and not
-  Ganley's Cape Cod Bay values, which are not open access. What is real is the
-  pattern: dive times falling and surface times rising through the season as
-  the food moves up, which puts `availability()` over them between about 0.25
-  and 0.85. Shipped so the worked example shows why a constant will not do.
+  intervals. **The numbers are invented** — not measurements, and not Ganley's
+  values. What is real is the pattern: dive times falling and surface times
+  rising through the season, which puts `availability()` over them between
+  about 0.25 and 0.85. Shipped so the worked example can show the full API,
+  standard errors included.
+
+* The test suite now reconciles against a published result. January's 16%
+  surface time and reported 0.27 availability, at a measured 51.22 s in view,
+  pin the dive time at about 6.1 minutes — inside the 1.30 to 8.83 min range
+  the paper gives for monthly mean dive times.
 
 ## What it refuses, and why
 

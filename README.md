@@ -151,7 +151,7 @@ constant.
 
 ### The equation
 
-Following [Laake and Borchers (2004)](https://global.oup.com/), for a mean
+Following [Laake et al. (1997)](https://doi.org/10.2307/3802415), for a mean
 surfacing interval `E(s)`, a mean diving interval `E(d)`, and a window `w`
 during which the animal is in view:
 
@@ -171,19 +171,31 @@ The middle term is the extra chance that an animal which was *down* when the
 window opened comes up before it closes. That is why a slower aircraft or a
 wider field of view raises availability without the whales changing anything.
 
-The window itself comes from geometry. `view_window()` treats the viewing area
-as a circle of radius `r` crossed at speed `v`, so a point at perpendicular
-distance `x` is in view along a chord:
+### The window, and a trap in it
+
+An **aircraft observer's field of view is a wedge running forward and aft**, not
+a circular patch. An animal further off the trackline sits in that wedge
+*longer*, so the window **grows** with perpendicular distance —
+[Ganley et al.](https://doi.org/10.3354/esr00938) measured time in view rising
+from about 50 s near the trackline to about 130 s at 3 km. `view_window_aerial()`
+is that geometry:
+
+```
+  t(x) = α + x · tan(θ) / v
+```
+
+`view_window()` is the other case, a genuinely circular viewing area crossed
+along a chord:
 
 ```
   w(x) = 2 · sqrt(r² − x²) / v
 ```
 
-which narrows with distance off the trackline and closes at the edge of view.
-It is the simplest useful geometry and will not fit every platform — a
-forward-looking window or an obscured belly gives a different `w` — so
-`availability()` takes `window` directly and a measured one can be substituted.
-Measuring it, as Ganley did for the aircraft they flew, beats deriving it.
+which *narrows* with distance and closes at the edge of view. **Using it for an
+aircraft gets the sign of the distance effect backwards**, which is why both
+exist and why the aerial one is the default worth reaching for here. Both are
+approximations: measuring the window — Ganley et al. timed a navigation buoy
+through the field of view — beats deriving it from either.
 
 ### It computes; it does not estimate
 
@@ -237,13 +249,27 @@ is the quantity whose CV routinely dominates the CV of abundance.
 Where the raw focal follows are in hand, bootstrapping them beats this, since it
 does not assume the interval means are jointly normal. That is what Ganley did.
 
-### The example data is mock
+### Two datasets, and which is real
 
-`example_dive_intervals` is **invented**. It is not a measurement, and it is
-specifically *not* Ganley's Cape Cod Bay table, which is not open access. What
-is real is the pattern it reproduces — dive times falling and surface times
-rising through a season, as the food moves up — so that a worked example shows
-why availability cannot be a constant. Substitute your own.
+`ganley_surface_time` is **real, and cited**: percent surface time from 87 focal
+follows of right whales in Cape Cod Bay, 16% in January against 55% in April as
+the copepods move up the water column. Percent surface time is
+`E(s)/(E(s)+E(d))` — exactly the `w → 0` limit above — so it is a **floor** on
+availability, and the seasonal problem in its rawest form.
+
+It carries only what the paper states in text. The monthly *availability*
+figures live in the paper's Fig. 4A and in a supplementary table, and reading
+bar heights off a figure is not a measurement, so the dataset stops where the
+text does. `data-raw/ganley-surface-time.R` says how to extend it.
+
+`example_dive_intervals` is **invented** — not a measurement, and not Ganley's
+table. What is real is the pattern it reproduces, so a worked example can show
+the full API including standard errors. Substitute your own.
+
+The package's own test suite reconciles against the published result: January's
+16% surface time and 0.27 availability at a measured 51.22 s in view pin the
+dive time at about 6.1 minutes, inside the 1.30–8.83 min range the paper
+reports for monthly mean dive times.
 
 ## What it will not do
 
@@ -325,8 +351,13 @@ Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there is:
 estimating North Atlantic right whale *Eubalaena glacialis* local abundance.
 *Endangered Species Research* 38:101–113.
 <https://doi.org/10.3354/esr00938>
-— *availability from focal follows, and the monthly variation that rules out a
-constant.*
+— *availability from focal follows, the monthly variation that rules out a
+constant, and the measured time in view behind `ganley_surface_time`.*
+
+Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997) Probability of
+detecting harbor porpoise from aerial surveys: estimating g(0). *The Journal of
+Wildlife Management* 61:63–75. <https://doi.org/10.2307/3802415>
+— *the availability equation itself.*
 
 Laake, J.L. and Borchers, D.L. (2004) Methods for incomplete detection at
 distance zero. In *Advanced Distance Sampling*, pp. 108–189. Oxford University

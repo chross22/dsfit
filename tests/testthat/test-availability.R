@@ -155,3 +155,89 @@ test_that("impossible platform geometry is refused", {
   expect_error(view_window(radius = 300, speed = 0), "point transect")
   expect_error(view_window(radius = 300, speed = 50, distance = -1), "negative")
 })
+
+test_that("an aircraft's window grows with distance, unlike a circular one", {
+  # The whole point of the aerial geometry: a wedge running forward and aft is
+  # wider further out, so an animal off the trackline stays in it longer. The
+  # circular geometry does the opposite, and using it for an aircraft gets the
+  # sign of the distance effect backwards.
+  x <- c(0, 500, 1500, 3000)
+  aerial <- view_window_aerial(trackline = 51.22, speed = 51.4, slope = 0.03,
+                               distance = x)
+  circular <- view_window(radius = 3000, speed = 51.4, distance = x)
+
+  expect_true(all(diff(aerial) > 0))
+  expect_true(all(diff(circular) < 0))
+
+  # On the trackline it is the trackline time, by construction.
+  expect_equal(aerial[1], 51.22)
+})
+
+test_that("the aerial window reproduces Ganley et al.'s measured platform", {
+  # Their Skymaster: 51.22 s in view at the effective trackline, rising at
+  # about 0.03 s per metre, giving roughly 130-150 s out at 3 km (their Fig. 1).
+  w <- view_window_aerial(trackline = 51.22, speed = 51.4, slope = 0.03,
+                          distance = 3000)
+  expect_gt(w, 120)
+  expect_lt(w, 160)
+})
+
+test_that("a half-angle and a calibrated slope are two routes to one window", {
+  speed <- 51.4
+  angle <- 57
+  by_angle <- view_window_aerial(trackline = 51.22, speed = speed,
+                                 angle = angle, distance = 1000)
+  by_slope <- view_window_aerial(trackline = 51.22, speed = speed,
+                                 slope = tan(angle * pi / 180) / speed,
+                                 distance = 1000)
+  expect_equal(by_angle, by_slope)
+})
+
+test_that("the aerial window refuses what it cannot mean", {
+  expect_error(view_window_aerial(trackline = 51, speed = 51.4),
+               "exactly one of")
+  expect_error(
+    view_window_aerial(trackline = 51, speed = 51.4, angle = 45, slope = 0.03),
+    "exactly one of"
+  )
+  expect_error(view_window_aerial(trackline = 51, speed = 51.4, angle = 90),
+               "between 0 and 90")
+  # A window that shrinks with distance is the circular case, not this one.
+  expect_error(view_window_aerial(trackline = 51, speed = 51.4, slope = -0.01),
+               "use `view_window\\(\\)`")
+})
+
+test_that("percent surface time is the instantaneous-window limit", {
+  # ganley_surface_time carries E(s)/(E(s)+E(d)) directly, which is what
+  # availability() returns when the window is zero.
+  pst <- ganley_surface_time$percent_surface_time / 100
+  a <- availability(surface = pst, dive = 1 - pst, window = 0)
+  expect_equal(a$value, pst)
+})
+
+test_that("Ganley et al.'s January availability is reproducible from theirs", {
+  # A check on the implementation against a published result. January's percent
+  # surface time is 16% and the reported availability is 0.27, at a measured
+  # 51.22 s in view. Those pin down the dive time: about 6.1 minutes, which
+  # falls inside the 1.30-8.83 min range of monthly mean dive times the paper
+  # reports. Agreement here means the formula is wired up the way theirs is.
+  #
+  # Not an exact replication: their monthly figures integrate over the distance
+  # distribution, where time in view rises with distance, rather than being
+  # evaluated at the trackline alone.
+  dive <- 6.1 * 60
+  surface <- (0.16 / 0.84) * dive
+
+  a <- availability(surface = surface, dive = dive, window = 51.22)
+  expect_equal(a$value, 0.27, tolerance = 0.01)
+
+  # And it sits inside the published range for the season either way.
+  expect_gt(a$value, 0.27 - 0.01)
+  expect_lt(a$value, 0.85)
+})
+
+test_that("the shipped surface times are the ones the paper states", {
+  expect_equal(ganley_surface_time$percent_surface_time, c(16, 34, 31, 55))
+  expect_equal(ganley_surface_time$n_follows, c(7L, 10L, 22L, 48L))
+  expect_equal(levels(ganley_surface_time$month), c("Jan", "Feb", "Mar", "Apr"))
+})

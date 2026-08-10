@@ -22,9 +22,9 @@
 #' is the point: it is visible rather than absorbed into a constant.
 #'
 #' @section The formula:
-#' Following Laake and Borchers (2004), for a mean surfacing interval
-#' \eqn{E(s)}, a mean diving interval \eqn{E(d)}, and a window \eqn{w} during
-#' which the animal is in view:
+#' Following Laake et al. (1997), for a mean surfacing interval \eqn{E(s)}, a
+#' mean diving interval \eqn{E(d)}, and a window \eqn{w} during which the animal
+#' is in view:
 #'
 #' \deqn{a = \frac{E(s) + E(d)\left(1 - e^{-w/E(d)}\right)}{E(s) + E(d)}}
 #'
@@ -83,9 +83,15 @@
 #'   correction is assembled from, so availability and perception rows stack.
 #'
 #' @references
+#' Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997) Probability
+#' of detecting harbor porpoise from aerial surveys: estimating g(0). *The
+#' Journal of Wildlife Management* 61:63-75. \doi{10.2307/3802415} The formula
+#' implemented here.
+#'
 #' Laake, J.L. and Borchers, D.L. (2004) Methods for incomplete detection at
 #' distance zero. In *Advanced Distance Sampling*, pp. 108-189. Oxford University
-#' Press. The formula implemented here.
+#' Press. Why perception needs a second observer team, and availability needs
+#' something outside the survey entirely.
 #'
 #' Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there
 #' is: estimating North Atlantic right whale *Eubalaena glacialis* local
@@ -213,11 +219,23 @@ availability <- function(surface, dive, window, se_surface = NULL,
 #' the edge of the view — an animal outside it is never available, which this
 #' returns as `0` rather than as an error.
 #'
-#' This is the simplest useful geometry and it will not fit every platform. A
-#' forward-looking window, an obscured belly, or a viewing area that is not
-#' circular all give a different \eqn{w}, and `availability()` takes `window`
-#' directly so that a better one can be substituted. Measuring it, as Ganley et
-#' al. (2019) did for the aircraft they flew, beats deriving it.
+#' @section This is the wrong geometry for most aerial surveys:
+#' A circular viewing area is what a platform watching a fixed patch has. An
+#' **aircraft observer looking through a side window does not have one**: the
+#' field of view is an angular wedge running forward and aft, so an animal
+#' further off the trackline sits in that wedge *longer*, not less. The window
+#' **grows** with perpendicular distance, and this function has the sign of that
+#' effect backwards for such a platform.
+#'
+#' Ganley et al. (2019) measured it for the Skymaster flown over Cape Cod Bay
+#' and found time in view rising from about 50 s near the trackline to about
+#' 130 s at 3 km, a slope of roughly 0.03 s per metre. Use
+#' [view_window_aerial()] there. This function is for a genuinely circular view,
+#' and is kept because that case exists — not because it is the default worth
+#' reaching for.
+#'
+#' Measuring the window, as Ganley et al. did by timing a navigation buoy
+#' through the field of view, beats deriving it from either formula.
 #'
 #' @param radius Radius of the viewing area, in metres.
 #' @param speed Platform ground speed, in metres per second.
@@ -227,7 +245,16 @@ availability <- function(surface, dive, window, se_surface = NULL,
 #' @return A numeric vector of window durations in seconds, `0` where `distance`
 #'   exceeds `radius`.
 #'
-#' @seealso [availability()]
+#' @references
+#' Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there
+#' is: estimating North Atlantic right whale *Eubalaena glacialis* local
+#' abundance. *Endangered Species Research* 38:101-113.
+#' \doi{10.3354/esr00938} Time in view measured for an aerial platform, and why
+#' it rises rather than falls with perpendicular distance.
+#'
+#' @seealso [view_window_aerial()] for an aircraft's forward-and-aft field of
+#'   view, which is the usual case here. [availability()] for what the window
+#'   feeds.
 #'
 #' @examples
 #' # A 300 m viewing radius at 50 m/s, on the trackline
@@ -257,7 +284,108 @@ view_window <- function(radius, speed, distance = 0) {
 }
 
 
-# a = (s + d(1 - exp(-w/d))) / (s + d), from Laake and Borchers (2004).
+#' The time an animal stays in view of an aircraft
+#'
+#' The window [availability()] needs, for an observer looking through a side
+#' window of an aircraft: a field of view running forward and aft, rather than a
+#' circular patch.
+#'
+#' @section Why this grows with distance:
+#' The field of view is an angular wedge. An animal further off the trackline
+#' sits inside that wedge for **longer**, because the wedge is wider out there.
+#' This is the opposite of [view_window()]'s circular geometry, and it is the
+#' case that applies to a line-transect aerial survey.
+#'
+#' Following Ganley et al. (2019), for a time in view \eqn{\alpha} at the
+#' trackline, a viewing half-angle \eqn{\theta} forward and aft, and ground
+#' speed \eqn{v}:
+#'
+#' \deqn{t(x) = \alpha + \frac{x \tan\theta}{v}}
+#'
+#' @section Calibrating it, rather than deriving it:
+#' Ganley et al. (2019) obtained \eqn{\alpha} and \eqn{\theta} by flying
+#' transects past a navigation buoy and timing it through the field of view,
+#' which is worth far more than a derivation from window dimensions. For the
+#' Cessna Skymaster over Cape Cod Bay, at 185 km/h and 228 or 304 m altitude,
+#' they found time in view at the effective trackline to be **51.22 s**, and a
+#' slope of about 0.03 s per metre of perpendicular distance. Altitude made no
+#' detectable difference across the two they flew.
+#'
+#' Their trackline is at 100 m rather than 0 m, because the aircraft's flat
+#' windows leave a blind spot directly beneath it — the same blind spot that
+#' `sweep_models(left = )` and the gamma key handle at the fitting end. Their
+#' surveys were left-truncated at 100 m for exactly that reason.
+#'
+#' @param trackline Time in view at the trackline, in seconds — \eqn{\alpha}.
+#' @param speed Ground speed, in metres per second.
+#' @param angle Viewing half-angle forward and aft, in **degrees** from
+#'   perpendicular. Give this or `slope`, not both.
+#' @param slope Seconds of view gained per metre of perpendicular distance,
+#'   \eqn{\tan\theta / v}, if it was calibrated directly. Give this or `angle`.
+#' @param distance Perpendicular distance, in metres.
+#'
+#' @return A numeric vector of window durations in seconds.
+#'
+#' @references
+#' Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there
+#' is: estimating North Atlantic right whale *Eubalaena glacialis* local
+#' abundance. *Endangered Species Research* 38:101-113.
+#' \doi{10.3354/esr00938}
+#'
+#' @seealso [availability()], [view_window()], [ganley_surface_time]
+#'
+#' @examples
+#' # Ganley et al.'s Skymaster, calibrated directly: 51.22 s at the trackline,
+#' # gaining about 0.03 s per metre out
+#' view_window_aerial(trackline = 51.22, speed = 51.4, slope = 0.03,
+#'                    distance = c(0, 1000, 3000))
+#'
+#' # The same thing from a viewing half-angle
+#' view_window_aerial(trackline = 51.22, speed = 51.4, angle = 57,
+#'                    distance = c(0, 1000, 3000))
+#'
+#' @export
+view_window_aerial <- function(trackline, speed, angle = NULL, slope = NULL,
+                               distance = 0) {
+  stopifnot(is.numeric(trackline), is.numeric(speed), is.numeric(distance))
+  if (is.null(angle) == is.null(slope)) {
+    rlang::abort(paste0(
+      "Give exactly one of `angle` (the viewing half-angle in degrees) or ",
+      "`slope` (seconds of view per metre, if it was calibrated directly)."
+    ))
+  }
+  if (any(!is.na(trackline) & trackline < 0)) {
+    rlang::abort("`trackline` is a duration in seconds and cannot be negative.")
+  }
+  if (any(!is.na(speed) & speed <= 0)) {
+    rlang::abort("`speed` must be positive.")
+  }
+  if (any(!is.na(distance) & distance < 0)) {
+    rlang::abort("`distance` is a perpendicular distance and cannot be negative.")
+  }
+
+  if (is.null(slope)) {
+    if (any(!is.na(angle) & (angle <= 0 | angle >= 90))) {
+      rlang::abort(paste0(
+        "`angle` is a half-angle in degrees from perpendicular, so it must be ",
+        "between 0 and 90. At 90 the field of view never closes."
+      ))
+    }
+    slope <- tan(angle * pi / 180) / speed
+  } else if (any(!is.na(slope) & slope < 0)) {
+    rlang::abort(paste0(
+      "`slope` cannot be negative: an aircraft's field of view widens with ",
+      "perpendicular distance, so time in view rises with it. For a circular ",
+      "viewing area, which narrows, use `view_window()`."
+    ))
+  }
+
+  trackline + distance * slope
+}
+
+
+# a = (s + d(1 - exp(-w/d))) / (s + d), Laake et al. (1997) equation 5 as
+# written out by Ganley et al. (2019).
 # `par` is c(surface, dive) so that numDeriv can differentiate it as a vector.
 availability_one <- function(par, window) {
   s <- par[[1]]

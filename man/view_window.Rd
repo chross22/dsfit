@@ -34,12 +34,26 @@ chord of length \eqn{2\sqrt{r^2 - x^2}}, so
 The window therefore shrinks with perpendicular distance, and is zero beyond
 the edge of the view — an animal outside it is never available, which this
 returns as \code{0} rather than as an error.
+}
 
-This is the simplest useful geometry and it will not fit every platform. A
-forward-looking window, an obscured belly, or a viewing area that is not
-circular all give a different \eqn{w}, and \code{availability()} takes \code{window}
-directly so that a better one can be substituted. Measuring it, as Ganley et
-al. (2019) did for the aircraft they flew, beats deriving it.
+\section{This is the wrong geometry for most aerial surveys}{
+
+A circular viewing area is what a platform watching a fixed patch has. An
+\strong{aircraft observer looking through a side window does not have one}: the
+field of view is an angular wedge running forward and aft, so an animal
+further off the trackline sits in that wedge \emph{longer}, not less. The window
+\strong{grows} with perpendicular distance, and this function has the sign of that
+effect backwards for such a platform.
+
+Ganley et al. (2019) measured it for the Skymaster flown over Cape Cod Bay
+and found time in view rising from about 50 s near the trackline to about
+130 s at 3 km, a slope of roughly 0.03 s per metre. Use
+\code{\link[=view_window_aerial]{view_window_aerial()}} there. This function is for a genuinely circular view,
+and is kept because that case exists — not because it is the default worth
+reaching for.
+
+Measuring the window, as Ganley et al. did by timing a navigation buoy
+through the field of view, beats deriving it from either formula.
 }
 
 \examples{
@@ -50,6 +64,15 @@ view_window(radius = 300, speed = 50)
 view_window(radius = 300, speed = 50, distance = c(0, 150, 290, 400))
 
 }
+\references{
+Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there
+is: estimating North Atlantic right whale \emph{Eubalaena glacialis} local
+abundance. \emph{Endangered Species Research} 38:101-113.
+\doi{10.3354/esr00938} Time in view measured for an aerial platform, and why
+it rises rather than falls with perpendicular distance.
+}
 \seealso{
-\code{\link[=availability]{availability()}}
+\code{\link[=view_window_aerial]{view_window_aerial()}} for an aircraft's forward-and-aft field of
+view, which is the usual case here. \code{\link[=availability]{availability()}} for what the window
+feeds.
 }
