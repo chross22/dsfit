@@ -130,12 +130,18 @@ In the order it is worth doing.
    now enforced in code rather than described here.
 
    Keyed, because a scalar is the error. Ganley et al. (2019) measured right
-   whale availability varying by month between 0.27 and 0.85, and perception
-   varying by year between 0.43 and 0.87; Roberts et al. (2024) correct per
-   platform, team and conditions. A figure like 0.83 sits inside both ranges,
-   which is what makes it dangerous — it is one component's value under one set
-   of conditions, and using it as `g(0)` understates the correction by more than
-   a factor of two when availability is ~0.5 and perception ~0.7.
+   whale availability varying by month from 0.27 in January to 0.91 in April;
+   Roberts et al. (2024) correct per platform, team and conditions. A figure
+   like 0.83 sits inside that range, which is what makes it dangerous — it is
+   one component's value under one set of conditions, and using it as `g(0)`
+   understates the correction by more than a factor of two when availability is
+   ~0.5 and perception ~0.7.
+
+   Ganley et al. did **not** estimate perception; their annual figures of
+   0.43–0.87 are `p`, the detection function's own average probability, which
+   is what `selection_table()` already reports. Perception needs a second
+   observer team, which is item 2 below and the binding constraint on the whole
+   correction.
 
    The three rules are enforced: no default and never silently 1; propagate the
    variance or refuse the correction, since its CV routinely dominates the CV of

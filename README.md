@@ -216,13 +216,12 @@ being absorbed into a constant.
 
 [Ganley et al. (2019)](https://doi.org/10.3354/esr00938) measured this for right
 whales in Cape Cod Bay with focal follows and the aircraft's field of view:
-**availability varied by month between 0.27 and 0.85**, tracking the depth of
-the copepod layer the whales were feeding on, while detection probability varied
-separately by year between 0.43 and 0.87.
-[Roberts et al. (2024)](https://doi.org/10.3354/meps14547) arrive at the same
-place from the other direction, correcting perception and availability per
-platform, per team and per conditions across 11 institutions and 2.9 million km
-of effort.
+**availability ran from 0.27 in January to 0.91 in April**, tracking the depth
+of the copepod layer the whales were feeding on. Those measurements ship as
+`ganley_availability`. [Roberts et al. (2024)](https://doi.org/10.3354/meps14547)
+arrive at the same place from the other direction, correcting perception and
+availability per platform, per team and per conditions across 11 institutions
+and 2.9 million km of effort.
 
 A single plausible-looking figure is therefore the most dangerous input this
 package accepts. Something like 0.83 sits comfortably inside *both* of those
@@ -249,27 +248,46 @@ is the quantity whose CV routinely dominates the CV of abundance.
 Where the raw focal follows are in hand, bootstrapping them beats this, since it
 does not assume the interval means are jointly normal. That is what Ganley did.
 
-### Two datasets, and which is real
+### Three datasets, and which are real
 
-`ganley_surface_time` is **real, and cited**: percent surface time from 87 focal
-follows of right whales in Cape Cod Bay, 16% in January against 55% in April as
-the copepods move up the water column. Percent surface time is
-`E(s)/(E(s)+E(d))` — exactly the `w → 0` limit above — so it is a **floor** on
-availability, and the seasonal problem in its rawest form.
+`ganley_availability` is **real and cited** — Table S1 of Ganley et al. (2019),
+complete: mean dive and surface intervals, percent surface time, and measured
+availability from 86 focal follows in Cape Cod Bay.
 
-It carries only what the paper states in text. The monthly *availability*
-figures live in the paper's Fig. 4A and in a supplementary table, and reading
-bar heights off a figure is not a measurement, so the dataset stops where the
-text does. `data-raw/ganley-surface-time.R` says how to extend it.
+| month | % surface | dive (s) | surface (s) | a(x) |
+|---|---|---|---|---|
+| Jan | 16 | 533 | 48 | **0.27** |
+| Feb | 34 | 256 | 226 | 0.52 |
+| Mar | 31 | 219 | 67 | 0.52 |
+| Apr | 55 | 88 | 801 | **0.91** |
 
-`example_dive_intervals` is **invented** — not a measurement, and not Ganley's
-table. What is real is the pattern it reproduces, so a worked example can show
-the full API including standard errors. Substitute your own.
+A **threefold swing across one season**, in measurements rather than argument.
 
-The package's own test suite reconciles against the published result: January's
-16% surface time and 0.27 availability at a measured 51.22 s in view pin the
-dive time at about 6.1 minutes, inside the 1.30–8.83 min range the paper
-reports for monthly mean dive times.
+`ganley_detection` is Table S2: twenty years of annual detection functions from
+one programme, one aircraft, one bay, with `p` between 0.431 and 0.866 and
+standard errors spanning an order of magnitude. Its columns line up with
+`selection_table()`'s. It is `p`, **not** perception bias — Ganley et al. state
+they did not estimate perception, since it needs a second observer team.
+
+`example_dive_intervals` is **invented**, and labelled so wherever it appears.
+It exists to demonstrate the API including standard errors.
+
+**Three traps in Table S1**, documented rather than smoothed over, because each
+is an inviting mistake:
+
+- `percent_surface_time` is **not** `E(s)/(E(s)+E(d))`. January is listed at 16%
+  while its own intervals give `48/(48+533)` = 8.3%; April is listed at 55%
+  against 90%. The percentage is a mean of per-follow percentages, the intervals
+  are means of intervals, and a mean of ratios is not a ratio of means. This
+  package asserted the identity until the table arrived; there is now a test
+  asserting it is false.
+- The `availability` figures are bootstrap medians, evaluated at no common
+  window — January's implies about two minutes in view, April's a few seconds.
+  `availability()` will not reproduce them, and is not meant to.
+- The variance column is ambiguous. Read literally, January's SE is `√0.04 =
+  0.2` against an estimate of 0.27, a CV of 74%; read as a standard error, 15%.
+  Neither matches the error bars in the paper's own figure, so it ships
+  unconverted under the paper's label and `g0()` makes you decide.
 
 ## Assembling a g(0) correction
 

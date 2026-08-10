@@ -110,12 +110,12 @@ First skeleton. The detection-function half of the fitting layer described in
   being corrected.
 
 * Why it is a function rather than a constant: Ganley et al. (2019) measured
-  right whale availability in Cape Cod Bay and found it varying by month
-  between **0.27 and 0.85**, with perception varying separately by year
-  between 0.43 and 0.87. Roberts et al. (2024) correct per platform, team and
-  conditions across 11 institutions. A single representative figure is a real
-  number for one month and wrong by a factor of two for others — and because
-  it scales every candidate equally, model selection never reveals it.
+  right whale availability in Cape Cod Bay varying by month from **0.27 in
+  January to 0.91 in April**, and Roberts et al. (2024) correct per platform,
+  team and conditions across 11 institutions. A single representative figure
+  is a real number for one month and wrong by a factor of three for others —
+  and because it scales every candidate equally, model selection never
+  reveals it.
 
 * Standard errors propagate by delta method from `se_surface` and `se_dive`,
   numerically as in `effect_estimates_ddf()`. Supplying one without the other
@@ -130,15 +130,25 @@ First skeleton. The detection-function half of the fitting layer described in
   sign of the distance effect backwards. Both are kept, because both cases
   exist, but the aerial one is what a line-transect aerial survey wants.
 
-* `ganley_surface_time`: real, cited percent surface time from 87 focal follows
-  of right whales in Cape Cod Bay — 16% in January against 55% in April, as the
-  copepods move up the water column. Percent surface time is the `w → 0` limit
-  of `availability()`, so it is a floor on availability and the seasonal
-  problem in its rawest form.
+* `ganley_availability` and `ganley_detection`: Tables S1 and S2 of Ganley et
+  al. (2019), transcribed complete. Measured availability runs from **0.27 in
+  January to 0.91 in April** — a threefold swing across one season, which is
+  the case against a constant `g(0)` in measurements rather than argument.
 
-  It carries only what the paper states in text. The monthly availability
-  figures are in a figure and a supplementary table, and reading bar heights
-  off a chart is not a measurement, so the dataset stops where the text does.
+  `ganley_detection` is twenty years of annual detection functions from one
+  programme, one aircraft and one bay, with `p` between 0.431 and 0.866 and
+  standard errors spanning an order of magnitude. It is `p`, **not** perception
+  bias — Ganley et al. state they did not estimate perception, since it needs a
+  second observer team. Its columns line up with `selection_table()`'s.
+
+  Three traps in Table S1 are documented rather than smoothed over.
+  `percent_surface_time` is **not** `E(s)/(E(s)+E(d))` — it is a mean of
+  per-follow percentages while the interval columns are means of intervals, and
+  January's listed 16% against its intervals' 8.3% shows the gap. The
+  `availability` figures are bootstrap medians evaluated at no common window, so
+  `availability()` will not reproduce them. And the variance column is
+  ambiguous enough that converting it silently would be a guess, so it ships
+  under the paper's own label, unconverted.
 
 * `example_dive_intervals`, a six-month table of surfacing and diving
   intervals. **The numbers are invented** — not measurements, and not Ganley's

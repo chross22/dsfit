@@ -207,37 +207,68 @@ test_that("the aerial window refuses what it cannot mean", {
                "use `view_window\\(\\)`")
 })
 
-test_that("percent surface time is the instantaneous-window limit", {
-  # ganley_surface_time carries E(s)/(E(s)+E(d)) directly, which is what
-  # availability() returns when the window is zero.
-  pst <- ganley_surface_time$percent_surface_time / 100
-  a <- availability(surface = pst, dive = 1 - pst, window = 0)
-  expect_equal(a$value, pst)
+test_that("Ganley's percent surface time is NOT the ratio of their means", {
+  # Worth a test because it is the obvious wrong assumption, and the one this
+  # package made until Table S1 arrived. The reported percentage is a mean of
+  # per-follow percentages; the interval columns are means of intervals. A mean
+  # of ratios is not a ratio of means, and here they differ by up to 35 points.
+  from_intervals <- with(ganley_availability,
+                         mean_surface / (mean_surface + mean_dive) * 100)
+  reported <- ganley_availability$percent_surface_time
+
+  expect_false(isTRUE(all.equal(from_intervals, reported)))
+  expect_gt(max(abs(from_intervals - reported)), 30)
+
+  # January's listed 16% against 8.3% from its intervals, April's 55% against
+  # 90% - the gap runs in both directions, so it is not a constant offset.
+  expect_lt(from_intervals[1], reported[1])
+  expect_gt(from_intervals[4], reported[4])
 })
 
-test_that("Ganley et al.'s January availability is reproducible from theirs", {
-  # A check on the implementation against a published result. January's percent
-  # surface time is 16% and the reported availability is 0.27, at a measured
-  # 51.22 s in view. Those pin down the dive time: about 6.1 minutes, which
-  # falls inside the 1.30-8.83 min range of monthly mean dive times the paper
-  # reports. Agreement here means the formula is wired up the way theirs is.
-  #
-  # Not an exact replication: their monthly figures integrate over the distance
-  # distribution, where time in view rises with distance, rather than being
-  # evaluated at the trackline alone.
-  dive <- 6.1 * 60
-  surface <- (0.16 / 0.84) * dive
+test_that("Ganley's availability is not recoverable at one common window", {
+  # Their a(x) is a bootstrap median and varies with distance through the time
+  # in view. Solving each month for the window it implies shows they were not
+  # evaluated at a shared one - January needs about two minutes, April a few
+  # seconds. This is why the values ship as measurements to use rather than
+  # outputs to recompute.
+  implied <- vapply(seq_len(nrow(ganley_availability)), function(i) {
+    s <- ganley_availability$mean_surface[i]
+    d <- ganley_availability$mean_dive[i]
+    target <- ganley_availability$availability[i]
+    f <- function(w) availability(s, d, w)$value - target
+    if (f(0) > 0) return(NA_real_)          # already above at an instant
+    stats::uniroot(f, c(0, 1e5))$root
+  }, numeric(1))
 
-  a <- availability(surface = surface, dive = dive, window = 51.22)
-  expect_equal(a$value, 0.27, tolerance = 0.01)
-
-  # And it sits inside the published range for the season either way.
-  expect_gt(a$value, 0.27 - 0.01)
-  expect_lt(a$value, 0.85)
+  expect_gt(implied[1], 100)                 # January, about two minutes
+  expect_lt(implied[4], 20)                  # April, seconds
+  expect_gt(max(implied, na.rm = TRUE) / min(implied, na.rm = TRUE), 5)
 })
 
-test_that("the shipped surface times are the ones the paper states", {
-  expect_equal(ganley_surface_time$percent_surface_time, c(16, 34, 31, 55))
-  expect_equal(ganley_surface_time$n_follows, c(7L, 10L, 22L, 48L))
-  expect_equal(levels(ganley_surface_time$month), c("Jan", "Feb", "Mar", "Apr"))
+test_that("the shipped tables are the ones the supplement prints", {
+  expect_equal(ganley_availability$percent_surface_time, c(16, 34, 31, 55))
+  expect_equal(ganley_availability$mean_dive, c(533, 256, 219, 88))
+  expect_equal(ganley_availability$mean_surface, c(48, 226, 67, 801))
+  expect_equal(ganley_availability$availability, c(0.27, 0.52, 0.52, 0.91))
+  expect_equal(ganley_availability$n_follows, c(7L, 9L, 22L, 48L))
+
+  # The pooled row is an attribute, not a fifth month, so it cannot be summed
+  # or plotted alongside them by accident.
+  expect_equal(nrow(ganley_availability), 4L)
+  expect_equal(attr(ganley_availability, "all_sightings")$n_follows, 86L)
+
+  expect_equal(nrow(ganley_detection), 20L)
+  expect_equal(range(ganley_detection$year), c(1998, 2017))
+  expect_equal(range(ganley_detection$p), c(0.431, 0.866))
+  # 2003 is the year that fails Kolmogorov-Smirnov and has the worst precision.
+  worst <- ganley_detection[which.max(ganley_detection$p_se), ]
+  expect_equal(worst$year, 2003)
+  expect_lt(worst$ks_p, 0.05)
+})
+
+test_that("the measured season is threefold, which is the whole argument", {
+  a <- ganley_availability$availability
+  expect_equal(min(a), 0.27)
+  expect_equal(max(a), 0.91)
+  expect_gt(max(a) / min(a), 3)
 })

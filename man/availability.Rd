@@ -83,15 +83,19 @@ animal which was down when the window opened comes up before it closes.
 \section{There is no single availability, and that is the finding}{
 
 Ganley et al. (2019) measured this for right whales in Cape Cod Bay and found
-availability varying by month between \strong{0.27 and 0.85}, tracking the depth of
-the copepod layer the whales were feeding on, with perception varying
-separately by year between 0.43 and 0.87.
+availability varying by month from \strong{0.27 in January to 0.91 in April},
+tracking the depth of the copepod layer the whales were feeding on. Those
+measurements ship as \link{ganley_availability}.
 
 A plausible-looking single figure is therefore the most dangerous input this
 package accepts. A value near 0.83 is a real number for some month, and wrong
-by a factor of two for others — and because it scales every model equally, no
-amount of model selection reveals it. Compute one per key and pass a vector,
-rather than picking a representative value.
+by a factor of three for others — and because it scales every model equally,
+no amount of model selection reveals it. Compute one per key and pass a
+vector, rather than picking a representative value.
+
+Note that this is availability alone. Perception is a separate component and
+a separate measurement, which Ganley et al. did not make — estimating it
+needs a second observer team. \code{\link[=g0]{g0()}} will say so if you leave it out.
 }
 
 \section{How the standard error is obtained}{
