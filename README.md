@@ -333,9 +333,13 @@ spot twice.
 Two distinctions it makes deliberately. **Absent structure is noted, ambiguous
 structure is warned about** — a survey that had one observer team is not
 misconfigured, and saying so as a warning on every dataset would bury the cases
-that are. And the blind-spot check asks whether the empty near strip is *wide
-against the truncation*, not merely whether the nearest detection exceeds zero,
-which every continuous distance does.
+that are. And the blind-spot check asks two questions rather than one: is the empty near
+strip *wide against the truncation* (not merely non-zero, which every continuous
+distance is), and does the distribution **begin abruptly or rise into itself**?
+A geometric cutoff is a discontinuity, so detections start near their peak rate;
+a real decline toward the trackline ramps up, which is the shape gamma is for.
+No key function is discontinuous, so against a hard edge gamma misfits like the
+rest — and the diagnosis says so instead of calling the spot handled.
 
 ## What your data can and cannot support
 

@@ -97,22 +97,57 @@ test_that("a covariate that cannot inform detection is flagged", {
   expect_match(out2, "missing values")
 })
 
-test_that("the blind spot is reported only when nothing handles it", {
+test_that("an abrupt edge is not treated as handled just because gamma is there", {
+  # The correction that matters. Gamma models a gradual reduction toward the
+  # trackline; a geometric cutoff is a discontinuity, and no key function is
+  # discontinuous. Calling it handled was false reassurance in exactly the case
+  # the vignette uses to demonstrate every candidate failing its fit test.
   blind <- survey(300, blind = 100)
 
-  # Neither treatment: warn, and predict the goodness-of-fit failure.
-  unhandled <- report(blind, model_set(c("hn", "hr")), truncation = 3000)
-  expect_match(unhandled, "no key function reproduces a cliff")
-  expect_match(unhandled, "% of the truncation width")
-
-  # Gamma handles it.
   with_gamma <- report(blind, model_set(c("hn", "gamma")), truncation = 3000)
-  expect_match(with_gamma, "handled by the gamma key")
-  expect_no_match(with_gamma, "reproduces a cliff")
+  expect_match(with_gamma, "WARN")
+  expect_match(with_gamma, "geometric edge")
+  expect_match(with_gamma, "including gamma")
+  expect_match(with_gamma, "fail its goodness-of-fit test")
 
-  # So does left truncation.
+  # Without gamma, the same edge, without the clause about gamma.
+  without <- report(blind, model_set(c("hn", "hr")), truncation = 3000)
+  expect_match(without, "geometric edge")
+  expect_no_match(without, "including gamma")
+
+  # Left truncation is the treatment that matches an edge, and removes it.
   with_left <- report(blind, model_set("hn"), truncation = 3000, left = 100)
-  expect_match(with_left, "handled by left truncation")
+  expect_match(with_left, "removed by left truncation")
+  expect_no_match(with_left, "geometric edge")
+})
+
+test_that("onset shape separates an edge from a rise, without fitting", {
+  set.seed(3)
+  abrupt <- data.frame(distance = 100 + abs(stats::rnorm(1500, 0, 700)))
+  expect_equal(onset_shape(abrupt, 100, 2500), "abrupt")
+
+  x <- seq(100, 2500, length.out = 2000)
+  gradual <- data.frame(
+    distance = sample(x, 1500, replace = TRUE,
+                      prob = stats::dnorm(x, mean = 900, sd = 500))
+  )
+  expect_equal(onset_shape(gradual, 100, 2500), "gradual")
+
+  # Too few detections to judge the shape of anything.
+  expect_equal(onset_shape(data.frame(distance = 1:10), 1, 100), "unknown")
+})
+
+test_that("a rise into the empty strip is what gamma is for", {
+  set.seed(3)
+  x <- seq(120, 3000, length.out = 3000)
+  rising <- data.frame(
+    object = 1:1500,
+    distance = sample(x, 1500, replace = TRUE,
+                      prob = stats::dnorm(x, mean = 1000, sd = 550))
+  )
+  out <- report(rising, model_set(c("hn", "gamma")), truncation = 3000)
+  expect_match(out, "detections rise into the empty strip")
+  expect_no_match(out, "geometric edge")
 })
 
 test_that("gamma and left together are still double counting", {

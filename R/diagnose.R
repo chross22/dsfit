@@ -187,15 +187,32 @@ diagnose_sweep <- function(data, models = NULL, truncation, left = NULL,
     warn("the set contains the gamma key and `left` is set. Both describe a ",
          "platform that cannot see beneath itself, so together they count the ",
          "blind spot twice")
-  } else if (blind && !has_gamma && is.null(left)) {
-    warn("no detections inside ", signif(near, 4), ", which is ",
-         round(100 * near / truncation), "% of the truncation width, and ",
-         "neither `left` nor the gamma key is in use. If that strip is a blind ",
-         "spot it is geometry, and no key function reproduces a cliff - expect ",
-         "every candidate to fail its goodness-of-fit test")
+  } else if (blind && !is.null(left)) {
+    pass("empty strip to ", signif(near, 4), " removed by left truncation at ",
+         left)
   } else if (blind) {
-    pass("blind spot to ", signif(near, 4), " handled by ",
-         if (has_gamma) "the gamma key" else paste0("left truncation at ", left))
+    abrupt <- identical(onset_shape(prepared$data, near, truncation), "abrupt")
+    where <- paste0("no detections inside ", signif(near, 4), ", which is ",
+                    round(100 * near / truncation),
+                    "% of the truncation width")
+
+    if (abrupt) {
+      # The distinction gamma cannot cross. A geometric cutoff is a
+      # discontinuity, and every key function is continuous.
+      warn(where, ", and detections begin at close to their peak rate rather ",
+           "than rising into it. That is the shape of a geometric edge, which ",
+           "`left` removes and no key function reproduces",
+           if (has_gamma) paste0(
+             " - including gamma, which models a gradual reduction toward the ",
+             "trackline rather than an edge. Expect it to fail its ",
+             "goodness-of-fit test too") else "")
+    } else if (has_gamma) {
+      pass("detections rise into the empty strip to ", signif(near, 4),
+           " rather than starting abruptly, which is the shape the gamma key ",
+           "is for")
+    } else {
+      warn(where, ", and neither `left` nor the gamma key is in use")
+    }
   }
 
   # A formula naming a column that is not there fails inside mrds, with a
@@ -233,6 +250,33 @@ diagnose_sweep <- function(data, models = NULL, truncation, left = NULL,
       "Problems above. Nothing was fitted.", "\n", sep = "")
 
   invisible(list(structure = struct, prepared = prepared, models = models))
+}
+
+
+# Does the near edge of the distance distribution begin abruptly, or rise into
+# itself? The two have different treatments and the difference is visible
+# without fitting anything.
+#
+# A geometric cutoff - an aircraft's flat windows, a hull blocking the view -
+# is a discontinuity: detection is zero, then immediately whatever it would
+# have been. So the first bin above the edge already sits near the modal rate.
+# A genuine decline in detectability toward the trackline instead ramps up, and
+# that is the unimodal shape the gamma key exists to fit.
+#
+# It matters because no key function is discontinuous. Gamma models a gradual
+# reduction, not an edge, so against a hard cutoff it misfits like the others.
+onset_shape <- function(data, near, truncation, bins = 20L) {
+  x <- if ("distance" %in% names(data)) data$distance else data$distbegin
+  x <- x[!is.na(x)]
+  if (length(x) < 40L || !is.finite(near) || near >= truncation) {
+    return("unknown")
+  }
+
+  edges <- seq(near, truncation, length.out = bins + 1L)
+  counts <- table(cut(x, breaks = edges, include.lowest = TRUE))
+  if (!length(counts) || max(counts) == 0) return("unknown")
+
+  if (counts[[1]] / max(counts) > 0.6) "abrupt" else "gradual"
 }
 
 

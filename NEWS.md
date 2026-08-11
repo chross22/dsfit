@@ -99,8 +99,20 @@ First skeleton. The detection-function half of the fitting layer described in
 * The blind-spot check asks whether the empty near strip is wide against the
   truncation, not merely whether the nearest detection exceeds zero — which
   every continuous distance does, and which would have fired on every survey
-  ever flown. It stays quiet when the gamma key or `left` already handles it,
-  and when neither does it predicts the goodness-of-fit failure that follows.
+  ever flown.
+
+* It then asks a second question, which decides the treatment: does the
+  distribution **begin abruptly, or rise into itself**? A geometric cutoff is a
+  discontinuity, so detections start at close to their peak rate; a genuine
+  decline in detectability toward the trackline ramps up instead, and that is
+  the unimodal shape the gamma key exists to fit. Both are visible without
+  fitting anything.
+
+  The distinction matters because **no key function is discontinuous**. Against
+  a hard edge, gamma misfits like the others, and the diagnosis says so rather
+  than reporting the spot as handled — which it did until running it on the
+  vignette's own survey, where it called an edge handled by gamma while the
+  vignette demonstrates that same model failing its goodness-of-fit test.
 
 ## Saying what the data can support
 
