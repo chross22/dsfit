@@ -166,3 +166,59 @@ test_that("printing groups by verdict and keeps the caveat", {
 test_that("bad input is refused", {
   expect_error(detection_structure("not a table"), "data frame")
 })
+
+test_that("NARWC identifier columns are not offered as detection covariates", {
+  skip_if_not_installed("narwcr")
+
+  # Before narwcr's vocabulary was consulted, this reported FILEID, EVENTNO,
+  # LATITUDE and LONGITUDE as things to model detection on. A file identifier
+  # and an event counter are not survey conditions.
+  d <- exact(120)
+  d$FILEID <- rep(c("A", "B"), 60)
+  d$EVENTNO <- seq_len(120)
+  d$LATITUDE <- seq(41, 43, length.out = 120)
+  d$LONGITUDE <- seq(-71, -69, length.out = 120)
+  d$SPECCODE <- rep(c("RIWH", "HUWH"), 60)
+  d$BEAUFORT <- rep(0:4, 24)
+
+  s <- detection_structure(d)
+  expect_false(any(c("FILEID", "EVENTNO", "LATITUDE", "LONGITUDE") %in%
+                     s$summary$covariates))
+  expect_true("BEAUFORT" %in% s$summary$covariates)
+})
+
+test_that("a programme's spelling of a condition is still recognised", {
+  skip_if_not_installed("narwcr")
+
+  # narwcr's aliases carry SEASTATE, SEA_STATE and BFT onto BEAUFORT. Without
+  # them each spelling would be an unrecognised column.
+  d <- exact(120)
+  d$SEASTATE <- rep(0:4, 24)
+  s <- detection_structure(d)
+
+  expect_true("SEASTATE" %in% s$summary$covariates)
+  expect_match(detail(s, "fit covariate models"), "survey conditions: SEASTATE")
+})
+
+test_that("columns narwcr does not know are still offered", {
+  # An unrecognised column may well be a real covariate, so the vocabulary
+  # narrows the false positives without narrowing the true ones.
+  d <- exact(120)
+  d$boatname <- rep(c("x", "y"), 60)
+  expect_true("boatname" %in% detection_structure(d)$summary$covariates)
+})
+
+test_that("classification works without narwcr installed", {
+  # The fallback is the mrds and flatfile names alone, which is right for
+  # non-NARWC data and merely less informed for NARWC data.
+  vocab <- narwc_vocabulary()
+  expect_type(vocab, "list")
+  expect_named(vocab, c("structural", "conditions", "aliases"))
+
+  d <- exact(120)
+  d$beaufort <- rep(0:4, 24)
+  d$size <- 1L
+  s <- detection_structure(d)
+  expect_true("beaufort" %in% s$summary$covariates)
+  expect_false("size" %in% s$summary$covariates)
+})

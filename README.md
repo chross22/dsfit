@@ -293,6 +293,50 @@ is an inviting mistake:
   Neither matches the error bars in the paper's own figure, so it ships
   unconverted under the paper's label and `g0()` makes you decide.
 
+## Before you sweep
+
+`diagnose_sweep()` runs the guards, the truncation and the model-set expansion —
+never `mrds::ddf()` — and reports the common ways a sweep goes wrong before it
+reaches the fitting:
+
+```r
+diagnose_sweep(detections, model_set(c("hn", "hr")), truncation = 2500)
+#> dsfit sweep diagnosis
+#>
+#> == Toolchain ==
+#>   ok    mrds 3.0.1 is installed
+#>
+#> == Data ==
+#>   ok    1999 rows, 1999 exact distances
+#>   note  estimate perception bias: no double-observer structure
+#>
+#> == Truncation ==
+#>   ok    1999 of 2050 rows kept at truncation 2500
+#>         dropped: 12 with no distance, 39 beyond the truncation
+#>   ok    1999 detections is at or above the 60-80 usually suggested
+#>
+#> == Model set ==
+#>   ok    2 candidates: hn, hr
+#>   WARN  no detections inside 100.1, which is 4% of the truncation width, and
+#>         neither `left` nor the gamma key is in use...
+#>
+#> == What is still assumed ==
+#>   g(0) = 1, unless a correction is applied at the abundance step.
+```
+
+It catches the things that otherwise surface as a cryptic error from inside
+`mrds`, or as a table that looks fine: a covariate formula naming a column that
+is not there, a truncation dropping most of the survey (usually a units
+mismatch), a constant or `NA`-riddled covariate, a model set counting the blind
+spot twice.
+
+Two distinctions it makes deliberately. **Absent structure is noted, ambiguous
+structure is warned about** — a survey that had one observer team is not
+misconfigured, and saying so as a warning on every dataset would bury the cases
+that are. And the blind-spot check asks whether the empty near strip is *wide
+against the truncation*, not merely whether the nearest detection exceeds zero,
+which every continuous distance does.
+
 ## What your data can and cannot support
 
 `detection_structure()` reads a table of detections and reports which analyses

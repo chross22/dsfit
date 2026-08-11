@@ -112,20 +112,37 @@ detection_structure <- function(data) {
       else "needs distances")
 
   # --- Covariates ---------------------------------------------------------
+  vocab <- narwc_vocabulary()
   structural <- c("object", "distance", "distbegin", "distend", "observer",
                   "detected", "size", "Region.Label", "Area", "Sample.Label",
-                  "Effort", "detected_by", "sample")
-  candidates <- setdiff(nm, structural)
+                  "Effort", "detected_by", "sample", vocab$structural)
+
+  canonical <- vapply(nm, function(x) {
+    hit <- vocab$aliases[[toupper(x)]]
+    if (is.null(hit)) x else hit
+  }, character(1))
+
+  keep <- !(canonical %in% structural)
+  candidates <- nm[keep]
   candidates <- candidates[vapply(data[candidates], function(x) {
     (is.numeric(x) || is.character(x) || is.factor(x) || is.logical(x)) &&
       length(unique(x[!is.na(x)])) > 1L
   }, logical(1))]
 
-  add("fit covariate models", length(candidates) > 0L,
-      if (length(candidates))
-        paste0("candidates: ", paste(utils::head(candidates, 8), collapse = ", "),
-               if (length(candidates) > 8) ", ..." else "")
-      else "no columns beyond the structural ones vary")
+  conditions <- candidates[canonical[match(candidates, nm)] %in% vocab$conditions]
+
+  detail <- if (!length(candidates)) {
+    "no columns beyond the structural ones vary"
+  } else {
+    d <- paste0("candidates: ", paste(utils::head(candidates, 8), collapse = ", "),
+                if (length(candidates) > 8) ", ..." else "")
+    if (length(conditions)) {
+      d <- paste0(d, "; recorded as survey conditions: ",
+                  paste(conditions, collapse = ", "))
+    }
+    d
+  }
+  add("fit covariate models", length(candidates) > 0L, detail)
 
   # --- Perception: the one that is usually the answer ---------------------
   obs <- perception_structure(data)
@@ -152,6 +169,38 @@ detection_structure <- function(data) {
   )
   class(out) <- "dsfit_structure"
   out
+}
+
+
+# NARWC's own column vocabulary, when narwcr is installed to supply it.
+#
+# The distinction that matters here is narwcr's, not ours. `narwc_never_fill()`
+# is the columns recorded per sighting - identifiers, positions, dates, the raw
+# angle and strip fields - none of which is a detection covariate.
+# `narwc_fill_columns()` is the columns recorded once per leg, which is what a
+# survey condition is: sea state, visibility, glare, altitude, platform.
+#
+# Without narwcr this returns empty and the classification falls back to the
+# `mrds` and flatfile names alone, which is right for non-NARWC data and merely
+# less informed for NARWC data.
+narwc_vocabulary <- function() {
+  empty <- list(structural = character(0), conditions = character(0),
+                aliases = list())
+  if (!requireNamespace("narwcr", quietly = TRUE)) return(empty)
+
+  grab <- function(f) {
+    out <- try(f(), silent = TRUE)
+    if (inherits(out, "try-error")) character(0) else as.character(out)
+  }
+  structural <- grab(narwcr::narwc_never_fill)
+  conditions <- grab(narwcr::narwc_fill_columns)
+  if (!length(structural) && !length(conditions)) return(empty)
+
+  aliases <- try(narwcr::narwc_schema()$aliases, silent = TRUE)
+  aliases <- if (inherits(aliases, "try-error") || is.null(aliases)) list() else
+    as.list(aliases)
+
+  list(structural = structural, conditions = conditions, aliases = aliases)
 }
 
 

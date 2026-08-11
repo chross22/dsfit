@@ -18,7 +18,9 @@ prepare_distance_data(data, truncation, left = NULL, breaks = NULL)
 }
 \value{
 A list with \code{data} (ready for \code{mrds}), \code{binned}, \code{breaks}, and
-\code{n_dropped}.
+\code{n_dropped}, and \code{dropped} — the attrition split by reason, so a
+truncation that trimmed a tail is distinguishable from one that threw away
+half the survey.
 }
 \description{
 Validates the table a sweep is about to be fitted to and puts it in the shape

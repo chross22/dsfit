@@ -73,6 +73,35 @@ First skeleton. The detection-function half of the fitting layer described in
   lands on its own: the fix was a statement about the aircraft rather than a
   better model, and nothing in the AIC column could have said so.
 
+## A pre-flight diagnosis
+
+* `diagnose_sweep(data, models, truncation = )` runs the input guards, the
+  truncation and the model-set expansion — never `mrds::ddf()` — and reports
+  the common ways a sweep goes wrong before it reaches the fitting. Modelled on
+  `msomgom::diagnose_pipeline()`, and reporting rather than fixing.
+
+  What it catches: a covariate formula naming a column that is not there, which
+  otherwise fails inside `mrds` with a message that does not name the column; a
+  truncation that drops most of the survey, which is usually a units mismatch;
+  too few detections left to fit anything worth reading; a covariate that is
+  constant or full of `NA`; a model set that counts the blind spot twice.
+
+* Attrition is broken down by reason — no distance, beyond the truncation,
+  inside `left` — rather than given as one total. `prepare_distance_data()`
+  gains a `dropped` vector carrying it. A total hides the difference between a
+  truncation that trimmed a tail and one that threw away half the survey.
+
+* Absent structure is **noted**; ambiguous structure is **warned** about. A
+  survey that had one observer team is not misconfigured, and saying so as a
+  warning on every dataset would bury the cases that are. Half-present
+  double-observer structure is the opposite, and warns.
+
+* The blind-spot check asks whether the empty near strip is wide against the
+  truncation, not merely whether the nearest detection exceeds zero — which
+  every continuous distance does, and which would have fired on every survey
+  ever flown. It stays quiet when the gamma key or `left` already handles it,
+  and when neither does it predicts the goodness-of-fit failure that follows.
+
 ## Saying what the data can support
 
 * `detection_structure()` reads a table of detections and reports which
@@ -100,6 +129,18 @@ First skeleton. The detection-function half of the fitting layer described in
 
 * It reports; `prepare_distance_data()` enforces. One is a briefing, the other
   is a gate, and there is a test asserting they disagree in exactly that way.
+
+* Column classification uses `narwcr`'s vocabulary when that package is
+  installed, and its own names otherwise. The distinction is narwcr's:
+  `narwc_never_fill()` is the per-sighting columns — identifiers, positions,
+  dates, raw angle and strip fields — and `narwc_fill_columns()` is the
+  per-leg ones, which is what a survey condition is.
+
+  Before this, a NARWC-shaped table had `FILEID`, `EVENTNO`, `LATITUDE` and
+  `LONGITUDE` offered as detection covariates. Aliases are resolved too, so
+  `SEASTATE` and `BFT` are recognised as sea state rather than as unknown
+  columns. Columns narwcr does not know are still offered, since an
+  unrecognised column may well be a real covariate.
 
 ## The g(0) correction slot
 

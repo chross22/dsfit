@@ -8,11 +8,12 @@ That document is the reasoning; this one is the state.
 
 ---
 
-## 1. Three layers
+## 1. The layers
 
 | Layer | Holds | Form |
 |---|---|---|
-| `distsamp` | NARWC ingest, effort, segmentation, right-angle distances | package |
+| `narwcr` | reading, the shared column vocabulary, code books, validation | package |
+| `distsamp` | effort, segmentation, right-angle distances | package |
 | **`dsfit`** | the model-selection sweep, gamma support, GOF and `p̄`, `g(0)` | **package** |
 | DSM layer | covariates, density surface models, the `dsm` handoff | separate package |
 | analysis repo | which years, which truncation, which covariates, the report | `targets` + `renv` |
@@ -24,6 +25,14 @@ neither; the covariate stack behind a density surface model is heavy (`terra`,
 makes for covariates and DSMs being their own package. Building an adapter here
 would drag two dependency trees in for one function. `dsfit` stops at the
 detection function and what it implies.
+
+`narwcr` was split out of `distsamp` after this table was first written: the
+reading and standardising layer is shared by analyses that diverge only in
+their modelling. `dsfit` does not depend on it for fitting — a detection
+function does not care where its distances came from — but
+`detection_structure()` uses its column vocabulary when it is installed, since
+recognising that `SEASTATE` and `BFT` are the same variable, and that `FILEID`
+is not a detection covariate, is knowledge that belongs there rather than here.
 
 The middle layer is a package rather than scripts because it is the part with
 logic that needs tests. An automated comparison over detection-function
@@ -113,8 +122,6 @@ previous one's AIC and `esw`. A wrong selection table, silently — which is the
 class of error this layer exists to catch.
 
 ## 4. The `g(0)` correction
-
-### The `g(0)` correction slot — built
 
 `availability()` computes the availability component from dive intervals and
 the platform's time in view, and `g0()` assembles the components: a **keyed

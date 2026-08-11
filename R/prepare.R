@@ -35,7 +35,9 @@
 #'   `NULL`.
 #'
 #' @return A list with `data` (ready for `mrds`), `binned`, `breaks`, and
-#'   `n_dropped`.
+#'   `n_dropped`, and `dropped` — the attrition split by reason, so a
+#'   truncation that trimmed a tail is distinguishable from one that threw away
+#'   half the survey.
 #'
 #' @seealso [sweep_models()]
 #'
@@ -78,6 +80,26 @@ prepare_distance_data <- function(data, truncation, left = NULL,
 
   n0 <- nrow(data)
 
+  # Attrition by reason, partitioned so every dropped row is counted once.
+  # A total on its own hides the difference between a truncation that trimmed
+  # a tail and one that threw away half the survey.
+  if (has_bin) {
+    gone_missing <- is.na(data$distbegin) | is.na(data$distend)
+    gone_beyond <- !gone_missing & data$distend > truncation
+    gone_inside <- if (is.null(left)) rep(FALSE, nrow(data)) else
+      !gone_missing & !gone_beyond & data$distbegin < left
+  } else {
+    gone_missing <- is.na(data$distance)
+    gone_beyond <- !gone_missing & data$distance > truncation
+    gone_inside <- if (is.null(left)) rep(FALSE, nrow(data)) else
+      !gone_missing & !gone_beyond & data$distance < left
+  }
+  dropped <- c(
+    no_distance = sum(gone_missing),
+    beyond_truncation = sum(gone_beyond),
+    inside_left = sum(gone_inside)
+  )
+
   if (has_bin) {
     keep <- !is.na(data$distbegin) & !is.na(data$distend)
     data <- data[keep, , drop = FALSE]
@@ -114,7 +136,7 @@ prepare_distance_data <- function(data, truncation, left = NULL,
     }
 
     return(list(data = ensure_object(data), binned = TRUE, breaks = breaks,
-                n_dropped = n0 - nrow(data)))
+                n_dropped = n0 - nrow(data), dropped = dropped))
   }
 
   keep <- !is.na(data$distance) & data$distance <= truncation
@@ -125,7 +147,7 @@ prepare_distance_data <- function(data, truncation, left = NULL,
   }
 
   list(data = ensure_object(data), binned = FALSE, breaks = NULL,
-       n_dropped = n0 - nrow(data))
+       n_dropped = n0 - nrow(data), dropped = dropped)
 }
 
 # Cutpoints implied by the bins present. They have to tile: a gap or an overlap
