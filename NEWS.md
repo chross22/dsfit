@@ -154,6 +154,26 @@ First skeleton. The detection-function half of the fitting layer described in
   columns. Columns narwcr does not know are still offered, since an
   unrecognised column may well be a real covariate.
 
+  A test now asserts the vocabulary is non-empty and carries the specific
+  facts the classification depends on. Without it, narwcr dropping or renaming
+  any of the three functions behind it would degrade **silently** — the
+  fallback is dsfit's own column list, so the NARWC false positives would
+  quietly return rather than anything erroring.
+
+* **Two columns naming one variable** are reported rather than silently
+  doubled. A MEMDR-era file can carry both `LEGTYPE` and `LEGTYPE_BK` meaning
+  the same thing, and unresolved that pair is ambiguous rather than merely
+  redundant — nothing in this package can tell which one a fit should use. The
+  rule for resolving it is narwcr's and stays there:
+  `read_narwc(prefer_source = TRUE)` believes the `_BK` column, and the
+  diagnosis says so rather than restating the preference.
+
+* A column displaced on read is no longer offered as a covariate.
+  `read_narwc()` keeps the loser of such a pair as `<TARGET>_ORIGINAL` for
+  traceability, and offering it as a covariate would undo the decision. The
+  rule keys on the stem being a variable narwcr knows, so a user's own column
+  that happens to end in `_ORIGINAL` is untouched.
+
 ## The g(0) correction slot
 
 * `g0()` assembles a correction from its named components, multiplies them,

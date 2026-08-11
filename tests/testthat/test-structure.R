@@ -222,3 +222,66 @@ test_that("classification works without narwcr installed", {
   expect_true("beaufort" %in% s$summary$covariates)
   expect_false("size" %in% s$summary$covariates)
 })
+
+test_that("the narwcr vocabulary is actually reaching us when installed", {
+  skip_if_not_installed("narwcr")
+
+  # Without this, narwcr dropping or renaming any of the three functions the
+  # vocabulary is built from degrades silently: classification falls back to
+  # dsfit's own column list and the NARWC-shaped false positives quietly
+  # return. A red test is the point.
+  vocab <- narwc_vocabulary()
+
+  expect_gt(length(vocab$structural), 0)
+  expect_gt(length(vocab$conditions), 0)
+  expect_gt(length(vocab$aliases), 0)
+
+  # The specific facts the classification relies on.
+  expect_true("FILEID" %in% vocab$structural)
+  expect_true("BEAUFORT" %in% vocab$conditions)
+  expect_equal(vocab$aliases[["SEASTATE"]], "BEAUFORT")
+  expect_equal(vocab$aliases[["LEGTYPE_BK"]], "LEGTYPE")
+})
+
+test_that("two columns naming one variable are reported, not silently doubled", {
+  skip_if_not_installed("narwcr")
+
+  # A MEMDR-era file can carry both LEGTYPE and LEGTYPE_BK, meaning the same
+  # thing. narwcr resolves it on read; unresolved, the pair is ambiguous, and
+  # nothing here can tell which one a fit should use.
+  d <- exact(120)
+  d$LEGTYPE <- rep(1:2, 60)
+  d$LEGTYPE_BK <- rep(1:2, 60)
+
+  s <- detection_structure(d)
+  expect_named(s$summary$duplicates, "LEGTYPE")
+  expect_setequal(s$summary$duplicates$LEGTYPE, c("LEGTYPE", "LEGTYPE_BK"))
+
+  out <- paste(utils::capture.output(print(s)), collapse = "\n")
+  expect_match(out, "two columns name LEGTYPE")
+  expect_match(out, "prefer_source")
+})
+
+test_that("a column displaced on read is not offered as a covariate", {
+  skip_if_not_installed("narwcr")
+
+  # read_narwc(prefer_source = TRUE) keeps the loser as <TARGET>_ORIGINAL
+  # rather than discarding it. Those are superseded duplicates kept for
+  # traceability, and offering one as a covariate would undo the decision.
+  d <- exact(120)
+  d$LEGTYPE <- rep(1:2, 60)
+  d$LEGTYPE_ORIGINAL <- rep(3:4, 60)
+
+  s <- detection_structure(d)
+  expect_false("LEGTYPE_ORIGINAL" %in% s$summary$covariates)
+  # And it is not counted as a second LEGTYPE either.
+  expect_length(s$summary$duplicates, 0)
+})
+
+test_that("an unrelated column ending in _ORIGINAL is left alone", {
+  # The rule keys on the stem being a variable narwcr knows, so a user's own
+  # column is not swept up by a suffix match.
+  d <- exact(120)
+  d$notes_ORIGINAL <- rep(c("a", "b"), 60)
+  expect_true("notes_ORIGINAL" %in% detection_structure(d)$summary$covariates)
+})

@@ -122,7 +122,17 @@ detection_structure <- function(data) {
     if (is.null(hit)) x else hit
   }, character(1))
 
-  keep <- !(canonical %in% structural)
+  # `read_narwc(prefer_source = TRUE)` keeps a displaced column as
+  # `<TARGET>_ORIGINAL` rather than discarding it - LEGTYPE_ORIGINAL where a
+  # MEMDR-era file carried both LEGTYPE and LEGTYPE_BK, say. Those are
+  # superseded duplicates kept for traceability, not covariates. Only names
+  # whose stem is a known variable are treated this way, so an unrelated column
+  # that happens to end in _ORIGINAL is left alone.
+  known <- unique(c(structural, vocab$conditions, unlist(vocab$aliases)))
+  superseded <- grepl("_ORIGINAL$", toupper(nm)) &
+    sub("_ORIGINAL$", "", toupper(nm)) %in% toupper(known)
+
+  keep <- !(canonical %in% structural) & !superseded
   candidates <- nm[keep]
   candidates <- candidates[vapply(data[candidates], function(x) {
     (is.numeric(x) || is.character(x) || is.factor(x) || is.logical(x)) &&
@@ -144,6 +154,15 @@ detection_structure <- function(data) {
   }
   add("fit covariate models", length(candidates) > 0L, detail)
 
+  # Two columns naming one variable. A MEMDR-era file carrying both LEGTYPE and
+  # LEGTYPE_BK is the case that prompted this, and narwcr resolves it -
+  # `read_narwc(prefer_source = TRUE)` believes the `_BK` column and keeps the
+  # other as LEGTYPE_ORIGINAL. Unresolved, the pair is ambiguous rather than
+  # merely redundant: nothing here can tell which one a fit should use.
+  dup_names <- unique(canonical[duplicated(canonical)])
+  dups <- lapply(dup_names, function(k) nm[canonical == k])
+  names(dups) <- dup_names
+
   # --- Perception: the one that is usually the answer ---------------------
   obs <- perception_structure(data)
   add("estimate perception bias", obs$supported, obs$detail)
@@ -164,7 +183,7 @@ detection_structure <- function(data) {
   out <- list(
     table = tab,
     summary = list(n = n, n_distances = n_dist, type = type,
-                   covariates = candidates,
+                   covariates = candidates, duplicates = dups,
                    nearest = nearest_distance(data, has_exact, has_binned))
   )
   class(out) <- "dsfit_structure"
@@ -265,6 +284,11 @@ print.dsfit_structure <- function(x, ...) {
   if (!is.na(s$nearest) && is.finite(s$nearest) && s$nearest > 0) {
     cat("  nearest detection at ", signif(s$nearest, 4),
         " - a blind spot beneath the platform would show here\n", sep = "")
+  }
+  for (k in names(s$duplicates)) {
+    cat("  two columns name ", k, ": ",
+        paste(s$duplicates[[k]], collapse = " and "),
+        " - narwcr::read_narwc(prefer_source = TRUE) resolves this\n", sep = "")
   }
 
   tab <- x$table

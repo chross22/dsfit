@@ -88,6 +88,15 @@ diagnose_sweep <- function(data, models = NULL, truncation, left = NULL,
   pass(struct$summary$n, " rows, ", struct$summary$n_distances, " ",
        struct$summary$type, " distances")
 
+  # Ambiguous rather than merely redundant: nothing here can tell which of two
+  # columns naming one variable a fit should use.
+  for (k in names(struct$summary$duplicates)) {
+    warn("two columns name ", k, ": ",
+         paste(struct$summary$duplicates[[k]], collapse = " and "),
+         ". Read the extract with narwcr::read_narwc(prefer_source = TRUE), ",
+         "which decides between them and keeps the loser as ", k, "_ORIGINAL")
+  }
+
   # Absent structure is noted; ambiguous structure is warned about. A survey
   # that simply had one observer team is not misconfigured, and saying so as a
   # WARN on every dataset would bury the cases that are. A half-present
