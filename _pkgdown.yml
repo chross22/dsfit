@@ -1,0 +1,54 @@
+# Served from camilleross.org/dsfit/, not chross22.github.io: GitHub applies
+# the user site's custom domain to every project page on the account. This must
+# name where visitors actually land, or the canonical link, sitemap and og:url
+# all point at a hostname nobody uses and search engines see two of each page.
+url: https://camilleross.org/dsfit/
+
+# NOT docs/. Several of these packages keep hand-written design notes and
+# methods write-ups in docs/, tracked in git, and a pkgdown build would erase
+# them. pkgdown refuses outright when it finds a docs/ it did not create; this
+# names a directory that is unambiguously generated.
+destination: pkgdown-site
+
+template:
+  bootstrap: 5
+  light-switch: true
+
+reference:
+- title: Fitting and comparing
+  desc: >
+    Fit a set of candidate keys at once and compare them on effective strip
+    half-width and its coefficient of variation, rather than on AIC alone.
+  contents:
+  - diagnose_sweep
+  - model_set
+  - selection_table
+  - sweep_models
+
+- title: Preparing survey data
+  desc: >
+    Getting distance data into the shape a detection function wants, and
+    describing the window an observer could actually see through.
+  contents:
+  - detection_structure
+  - prepare_distance_data
+  - view_window
+  - view_window_aerial
+
+- title: Detection on the line
+  desc: >
+    Availability and perception bias: what was there, versus what could have
+    been seen at all.
+  contents:
+  - availability
+  - effect_estimates.ddf
+  - g0
+
+- title: Bundled data
+  desc: >
+    Dive-interval and detection data shipped with the package, so the
+    examples and the availability correction run without needing an extract.
+  contents:
+  - example_dive_intervals
+  - ganley_availability
+  - ganley_detection

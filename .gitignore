@@ -17,3 +17,6 @@ figure/
 
 # Reference PDFs kept locally for data-raw transcription, not redistributed
 data-raw/*.pdf
+
+# generated pkgdown site
+pkgdown-site/
