@@ -1,12 +1,12 @@
 # Extract a fitted detection function as a tidy frame
 
 An
-[`fancyfx::effect_estimates()`](https://rdrr.io/pkg/fancyfx/man/effect_estimates.html)
+[`fancyfx::effect_estimates()`](https://camilleross.org/fancyfx/reference/effect_estimates.html)
 method for `mrds` detection functions, so that a fitted `ddf` can be
 plotted with
-[`fancyfx::plotEffects()`](https://rdrr.io/pkg/fancyfx/man/plotEffects.html)
+[`fancyfx::plotEffects()`](https://camilleross.org/fancyfx/reference/plotEffects.html)
 and
-[`fancyfx::plotRugs()`](https://rdrr.io/pkg/fancyfx/man/plotRugs.html)
+[`fancyfx::plotRugs()`](https://camilleross.org/fancyfx/reference/plotRugs.html)
 like any other model.
 
 ## Usage
@@ -84,7 +84,7 @@ effect_estimates_ddf(
 
 A data frame with `.x`, `.estimate`, `.lower`, `.upper`, and a
 `"quantity"` attribute, as
-[`fancyfx::effect_estimates()`](https://rdrr.io/pkg/fancyfx/man/effect_estimates.html)
+[`fancyfx::effect_estimates()`](https://camilleross.org/fancyfx/reference/effect_estimates.html)
 specifies.
 
 ## Why this method has to exist
