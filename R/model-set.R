@@ -18,9 +18,10 @@
 #' }
 #'
 #' @section When gamma is the right shape, and when it is a trap:
-#' An aircraft cannot see the water directly beneath it. Where that is true the
-#' gamma key describes the survey rather than distorting it, and a half-normal
-#' forced through a peak at zero will misfit the near distances.
+#' An aircraft cannot see the water directly beneath it, and neither can a ship
+#' see past its own bow wave. Where that is true the gamma key describes the
+#' survey rather than distorting it, and a half-normal forced through a peak at
+#' zero will misfit the near distances.
 #'
 #' But a gamma key and a **left truncation model the same phenomenon**. Using
 #' both accounts for the blind spot twice. Pick one deliberately and record

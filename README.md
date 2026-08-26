@@ -103,10 +103,10 @@ error.
 its peak away from zero** — is available in `mrds` alone, which is one reason
 this package fits through `mrds` directly rather than wrapping `ds()`.
 
-It is the natural shape for an aerial platform that cannot see the water directly
-beneath it. But a gamma key and a **left truncation model the same phenomenon**,
-so applying both accounts for the blind spot twice. `sweep_models()` warns when
-you do.
+It is the natural shape for a platform that cannot see the water directly
+beneath it — an aircraft's flat windows, or a hull. But a gamma key and a **left
+truncation model the same phenomenon**, so applying both accounts for the blind
+spot twice. `sweep_models()` warns when you do.
 
 ## Plotting
 
@@ -148,6 +148,17 @@ fitted — given dive parameters, the answer follows arithmetically, so its
 uncertainty is inherited from the dive study rather than from your survey.
 `ganley_surface_time()` carries the measured monthly surface times from Ganley et
 al. (2019), which vary enough month to month to rule out a constant.
+
+The window itself comes from the platform's geometry, and the three platforms
+are three different shapes. `view_window()` is a circular patch, watched fore
+and aft, so its window is the full chord. `view_window_aerial()` is a wedge
+through a side window, so the window **grows** with perpendicular distance —
+which is the opposite sign, and the reason the circular formula is wrong for
+most aerial surveys. `view_window_vessel()` (or `view_window_ship()`) is a
+ship's forward search arc: it opens when the animal enters the searched sector
+and closes when it draws abeam, because behind the beam there is nothing to see
+that has not already been counted. At a full beam-to-beam forward search it is
+exactly half the circular window.
 
 `g0()` assembles a full correction from components, keeps their sources named
 separately, and propagates the standard error.

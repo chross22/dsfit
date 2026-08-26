@@ -23,8 +23,9 @@ part with project-specific choices is not.
 
 \code{Distance} is the right tool for fitting one model interactively, and this
 package does not replace it. But \code{ds()} offers \code{hn}, \code{hr}, and \code{unif} only,
-and the gamma key — the natural model for an aerial platform that cannot see
-beneath itself — is available in \code{mrds} alone. Fitting the whole model set
+and the gamma key — the natural model for a platform that cannot see
+beneath itself, whether flat aircraft windows or a hull — is available in
+\code{mrds} alone. Fitting the whole model set
 through \code{mrds::ddf()} also keeps every AIC in a selection table coming off
 the same likelihood machinery, rather than mixing two wrappers' handling of
 truncation and monotonicity and presenting the difference as a model
@@ -63,6 +64,7 @@ pp. 31-47. Oxford University Press.
 Useful links:
 \itemize{
   \item \url{https://github.com/chross22/dsfit}
+  \item \url{https://camilleross.org/dsfit/}
   \item Report bugs at \url{https://github.com/chross22/dsfit/issues}
 }
 

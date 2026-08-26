@@ -257,8 +257,8 @@ availability <- function(surface, dive, window, se_surface = NULL,
 #' it rises rather than falls with perpendicular distance.
 #'
 #' @seealso [view_window_aerial()] for an aircraft's forward-and-aft field of
-#'   view, which is the usual case here. [availability()] for what the window
-#'   feeds.
+#'   view, which is the usual case here, and [view_window_vessel()] for a ship's
+#'   forward search arc. [availability()] for what the window feeds.
 #'
 #' @examples
 #' # A 300 m viewing radius at 50 m/s, on the trackline
@@ -336,7 +336,8 @@ view_window <- function(radius, speed, distance = 0) {
 #' abundance. *Endangered Species Research* 38:101-113.
 #' \doi{10.3354/esr00938}
 #'
-#' @seealso [availability()], [view_window()], [ganley_availability]
+#' @seealso [availability()], [view_window()], [view_window_vessel()],
+#'   [ganley_availability]
 #'
 #' @examples
 #' # Ganley et al.'s Skymaster, calibrated directly: 51.22 s at the trackline,
@@ -386,6 +387,132 @@ view_window_aerial <- function(trackline, speed, angle = NULL, slope = NULL,
 
   trackline + distance * slope
 }
+
+
+#' The time an animal stays in view of a vessel
+#'
+#' The window [availability()] needs, for observers searching a forward arc from
+#' a ship: a sector ahead of the bow, which a point on the water enters when it
+#' comes inside the search angle and leaves when it draws abeam.
+#'
+#' @section Why a ship is neither of the other two:
+#' [view_window()] is a circular patch, watched fore and aft alike, so its
+#' window is the full chord. [view_window_aerial()] is a wedge through a side
+#' window, so its window *grows* with perpendicular distance. A shipboard
+#' observer does neither: the search is **forward only**. Behind the beam there
+#' is nothing to see that has not already been counted, and a survey that
+#' counted it would be counting the same animal twice.
+#'
+#' So the window runs from the moment the animal enters the searched sector to
+#' the moment it draws abeam, and no further. For a search radius \eqn{r}, a
+#' search half-angle \eqn{\theta} measured from the bow, a speed \eqn{v} and a
+#' perpendicular distance \eqn{x}:
+#'
+#' \deqn{w(x) = \frac{\sqrt{r^2 - x^2} - x/\tan\theta}{v}}
+#'
+#' The first term is where the animal crosses the radius; the second is where it
+#' crosses the edge of the search angle. Whichever it meets later is where the
+#' window opens, so the window is zero when the second exceeds the first — an
+#' animal too far off the bow to be searched before it passes.
+#'
+#' At `angle = 90` the sector is the full forward half-disc, \eqn{x/\tan\theta}
+#' is zero, and the window is exactly **half** [view_window()]'s: same chord,
+#' half of it aft of the beam and never searched.
+#'
+#' @section Calibrating it, rather than deriving it:
+#' The same caution applies as for an aircraft. `radius` is an *effective*
+#' search radius — how far the observers were actually detecting, not how far
+#' the big-eyes reach — and it is worth measuring rather than assuming. A
+#' truncation distance from the fitted detection function is a better starting
+#' point than a nominal one.
+#'
+#' Nothing here corrects for a ship's own effect on the animals. Vessel
+#' avoidance and attraction both move animals before they are counted, and
+#' neither is an availability problem: availability asks whether an animal that
+#' was there surfaced in time to be seen. See [g0()] for where the components
+#' combine.
+#'
+#' @param radius Effective search radius ahead of the vessel, in metres.
+#' @param speed Vessel speed over ground, in metres per second.
+#' @param angle Search half-angle from the bow, in **degrees**. `90` (default)
+#'   is a full beam-to-beam forward search; a narrower arc is narrower.
+#' @param distance Perpendicular distance, in metres. `0` (default) is on the
+#'   trackline, which gives the widest window.
+#'
+#' @return A numeric vector of window durations in seconds, `0` where the animal
+#'   is never inside the searched sector.
+#'
+#' @references
+#' Buckland, S.T., Anderson, D.R., Burnham, K.P., Laake, J.L., Borchers, D.L.
+#' and Thomas, L. (2001) *Introduction to Distance Sampling.* Oxford University
+#' Press. Shipboard line transect search geometry, and why the search is
+#' forward of the beam.
+#'
+#' Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997) Probability
+#' of detecting harbor porpoise from aerial surveys: estimating g(0). *The
+#' Journal of Wildlife Management* 61:63-75. \doi{10.2307/3802415} The
+#' availability formula this window feeds.
+#'
+#' @seealso [availability()] for what the window feeds, [view_window_aerial()]
+#'   for an aircraft's forward-and-aft wedge, and [view_window()] for a
+#'   circular patch.
+#'
+#' @examples
+#' # A 6 km effective search radius at 10 knots (5.1 m/s), on the trackline
+#' view_window_vessel(radius = 6000, speed = 5.1)
+#'
+#' # The window closes as the animal approaches the edge of the sector
+#' view_window_vessel(radius = 6000, speed = 5.1,
+#'                    distance = c(0, 2000, 5000, 7000))
+#'
+#' # A narrower search arc loses the animals furthest off the bow first
+#' view_window_vessel(radius = 6000, speed = 5.1, angle = 45,
+#'                    distance = c(0, 2000, 5000))
+#'
+#' # A full forward search is half a circular patch: the aft half is never
+#' # searched
+#' view_window_vessel(radius = 300, speed = 50) == view_window(300, 50) / 2
+#'
+#' @export
+view_window_vessel <- function(radius, speed, angle = 90, distance = 0) {
+  stopifnot(is.numeric(radius), is.numeric(speed), is.numeric(distance),
+            is.numeric(angle))
+  if (any(!is.na(radius) & radius <= 0)) {
+    rlang::abort("`radius` must be positive.")
+  }
+  if (any(!is.na(speed) & speed <= 0)) {
+    rlang::abort(paste0(
+      "`speed` must be positive. A stationary platform keeps an animal in ",
+      "view indefinitely, which is a point transect rather than a line one."
+    ))
+  }
+  if (any(!is.na(distance) & distance < 0)) {
+    rlang::abort("`distance` is a perpendicular distance and cannot be negative.")
+  }
+  if (any(!is.na(angle) & (angle <= 0 | angle > 90))) {
+    rlang::abort(paste0(
+      "`angle` is a half-angle in degrees from the bow, so it must be above 0 ",
+      "and at most 90. Above 90 the search reaches abaft the beam, where an ",
+      "animal has already been passed - for a view that keeps watching aft, ",
+      "use `view_window()`."
+    ))
+  }
+
+  # Where the animal enters the radius, and where it enters the search arc.
+  # The window opens at whichever it meets later, which is why this is a
+  # difference and not a minimum.
+  enters_radius <- sqrt(pmax(radius^2 - distance^2, 0))
+  # tan(90 degrees) is not exactly infinite in floating point, so pin the
+  # full-forward case to an exact zero rather than to something near it.
+  enters_arc <- ifelse(angle == 90, 0, distance / tan(angle * pi / 180))
+
+  pmax(enters_radius - enters_arc, 0) / speed
+}
+
+
+#' @rdname view_window_vessel
+#' @export
+view_window_ship <- view_window_vessel
 
 
 # a = (s + d(1 - exp(-w/d))) / (s + d), Laake et al. (1997) equation 5 as

@@ -73,6 +73,6 @@ it rises rather than falls with perpendicular distance.
 }
 \seealso{
 \code{\link[=view_window_aerial]{view_window_aerial()}} for an aircraft's forward-and-aft field of
-view, which is the usual case here. \code{\link[=availability]{availability()}} for what the window
-feeds.
+view, which is the usual case here, and \code{\link[=view_window_vessel]{view_window_vessel()}} for a ship's
+forward search arc. \code{\link[=availability]{availability()}} for what the window feeds.
 }

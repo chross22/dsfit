@@ -12,8 +12,9 @@
 #' @section Why not `Distance::ds()`:
 #' `Distance` is the right tool for fitting one model interactively, and this
 #' package does not replace it. But `ds()` offers `hn`, `hr`, and `unif` only,
-#' and the gamma key — the natural model for an aerial platform that cannot see
-#' beneath itself — is available in `mrds` alone. Fitting the whole model set
+#' and the gamma key — the natural model for a platform that cannot see
+#' beneath itself, whether flat aircraft windows or a hull — is available in
+#' `mrds` alone. Fitting the whole model set
 #' through `mrds::ddf()` also keeps every AIC in a selection table coming off
 #' the same likelihood machinery, rather than mixing two wrappers' handling of
 #' truncation and monotonicity and presenting the difference as a model

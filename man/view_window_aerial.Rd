@@ -75,5 +75,6 @@ abundance. \emph{Endangered Species Research} 38:101-113.
 \doi{10.3354/esr00938}
 }
 \seealso{
-\code{\link[=availability]{availability()}}, \code{\link[=view_window]{view_window()}}, \link{ganley_availability}
+\code{\link[=availability]{availability()}}, \code{\link[=view_window]{view_window()}}, \code{\link[=view_window_vessel]{view_window_vessel()}},
+\link{ganley_availability}
 }

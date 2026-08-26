@@ -48,7 +48,8 @@
 #' boundary rather than a model set. Data carrying both is refused.
 #'
 #' @section Left truncation and the gamma key are alternatives:
-#' Both describe an aircraft that cannot see beneath itself. Applying `left`
+#' Both describe a platform that cannot see beneath itself — an aircraft's flat
+#' windows, or a hull. Applying `left`
 #' to a model set that contains the gamma key accounts for the blind spot twice,
 #' and warns.
 #'
