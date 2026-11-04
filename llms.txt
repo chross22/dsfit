@@ -1,8 +1,7 @@
 # dsfit
 
-Fit and compare detection functions for line-transect distance sampling
-— and compare them on the quantities that decide abundance, not on AIC
-alone.
+Fits and compares detection functions for line-transect distance
+sampling.
 
 Takes the flatfile produced by
 [`distsamp`](https://github.com/chross22/distsamp) (or any equivalent
@@ -76,13 +75,12 @@ propagates into density. Two models within 2 AIC of one another can
 imply materially different abundance, and nothing in an AIC column shows
 that.
 
-## Goodness of fit, and which test you get
+## Goodness of fit
 
-A model can top the AIC ranking and still fail a goodness-of-fit test,
-so one sits in the table. Which one follows the data rather than a
-preference: Cramér-von Mises (`cvm_p`) for exact distances, and a
-chi-square over the survey’s own bins (`chisq_p`) for binned ones, which
-have no empirical distribution for CvM to test.
+A model can top the AIC ranking and still fail a goodness-of-fit test.
+Test used is determined by the data: Cramér-von Mises (`cvm_p`) for
+exact distances, and a chi-square over the survey’s own bins (`chisq_p`)
+for binned ones, which have no empirical distribution for CvM to test.
 [`print()`](https://rdrr.io/r/base/print.html) shows whichever applies.
 
 Both columns are named for their test, because a p-value read without
@@ -90,7 +88,7 @@ knowing what produced it is worse than no p-value. `chisq_p` is filled
 in for exact fits too, but over cutpoints `mrds` chooses rather than
 bins anyone surveyed — read `cvm_p` there.
 
-## Snapshot tests, and why they are the point
+## Snapshot tests
 
 The sweep *selects* a model. The snapshots in
 `tests/testthat/test-selection-snapshot.R` pin the selection — the whole

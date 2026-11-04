@@ -71,7 +71,7 @@
 </h1></div>
 <!-- badges: start -->
 
-<p>Fit and compare detection functions for line-transect distance sampling — and compare them on the quantities that decide abundance, not on AIC alone.</p>
+<p>Fits and compares detection functions for line-transect distance sampling.</p>
 <p>Takes the flatfile produced by <a href="https://github.com/chross22/distsamp" class="external-link"><code>distsamp</code></a> (or any equivalent table), fits a set of candidate detection functions through <code>mrds</code>, and returns a selection table carrying effective strip half-width and its CV alongside each AIC.</p>
 <blockquote>
 <p><strong>Status: complete in scope.</strong> The model set, the sweep, the input guards, snapshot regression tests pinning the selection, the <code>g(0)</code> correction slot and a vignette are built and tested. Density surface models live in their own package. See <a href="docs/01-plan.html">docs/01-plan.md</a>.</p>
@@ -117,13 +117,13 @@
 <p><strong>Effective strip half-width sits next to the AIC.</strong> It is what propagates into density. Two models within 2 AIC of one another can imply materially different abundance, and nothing in an AIC column shows that.</p>
 </div>
 <div class="section level2">
-<h2 id="goodness-of-fit-and-which-test-you-get">Goodness of fit, and which test you get<a class="anchor" aria-label="anchor" href="#goodness-of-fit-and-which-test-you-get"></a>
+<h2 id="goodness-of-fit">Goodness of fit<a class="anchor" aria-label="anchor" href="#goodness-of-fit"></a>
 </h2>
-<p>A model can top the AIC ranking and still fail a goodness-of-fit test, so one sits in the table. Which one follows the data rather than a preference: Cramér-von Mises (<code>cvm_p</code>) for exact distances, and a chi-square over the survey’s own bins (<code>chisq_p</code>) for binned ones, which have no empirical distribution for CvM to test. <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> shows whichever applies.</p>
+<p>A model can top the AIC ranking and still fail a goodness-of-fit test. Test used is determined by the data: Cramér-von Mises (<code>cvm_p</code>) for exact distances, and a chi-square over the survey’s own bins (<code>chisq_p</code>) for binned ones, which have no empirical distribution for CvM to test. <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> shows whichever applies.</p>
 <p>Both columns are named for their test, because a p-value read without knowing what produced it is worse than no p-value. <code>chisq_p</code> is filled in for exact fits too, but over cutpoints <code>mrds</code> chooses rather than bins anyone surveyed — read <code>cvm_p</code> there.</p>
 </div>
 <div class="section level2">
-<h2 id="snapshot-tests-and-why-they-are-the-point">Snapshot tests, and why they are the point<a class="anchor" aria-label="anchor" href="#snapshot-tests-and-why-they-are-the-point"></a>
+<h2 id="snapshot-tests">Snapshot tests<a class="anchor" aria-label="anchor" href="#snapshot-tests"></a>
 </h2>
 <p>The sweep <em>selects</em> a model. The snapshots in <code>tests/testthat/test-selection-snapshot.R</code> pin the selection — the whole table, not just the winner — so that an <code>mrds</code> upgrade cannot quietly change which model wins or by how much. A swap between models three and four is the same change arriving early enough to look at.</p>
 <p>This is the requirement that made the middle layer a package. Writing them turned up a live bug in which a candidate that failed to fit shifted every model below it onto the wrong row, producing a wrong selection table rather than an error.</p>
