@@ -139,14 +139,13 @@ probability is constant.
 
 ## Availability
 
-`g(0)` has three components, and they are different things: the
-**geometric blind spot** under the aircraft, **availability** (whether
-the animal was at the surface to be seen), and **perception** (whether
-an observer who could have seen it did). Correcting for one while
-believing you have corrected for another is how these estimates go wrong
-by a factor rather than a percentage.
+`g(0)` has three components: the **geometric blind spot** under the
+aircraft, **availability** (whether the animal was at the surface to be
+seen), and **perception** (whether an observer who could have seen it
+did). Correcting for one while believing you have corrected for another
+is how these estimates go wrong by a factor rather than a percentage.
 
-dsfit computes one of them.
+dsfit computes only availability.
 [`availability()`](https://camilleross.org/dsfit/reference/availability.md)
 implements the Laake et al. (1997) equation from external dive data —
 surface and dive times, and the time an animal spends in view:
@@ -176,34 +175,7 @@ datasets are real, what a sweep needs before you run one, what your data
 can and cannot support, and how to record where each component came
 from.
 
-## What it will not do
-
-Estimate `g(0)`. Every fit here conditions on the animal having been
-available and seen, and a mis-specified `g(0)` shifts every candidate in
-a set by the same factor — the ranking looks untouched while the density
-is wrong. It cannot be estimated from a standard NARWC extract, which
-records neither dive data nor the double-observer structure
-mark-recapture needs.
-
-Nor does it **apply** the correction
-[`g0()`](https://camilleross.org/dsfit/reference/g0.md) builds. Dividing
-abundance by g(0) and carrying its CV through happens at the abundance
-step, in the analysis layer.
-
-[`availability()`](https://camilleross.org/dsfit/reference/availability.md)
-is not an exception to this: it is a calculation from external dive
-data, and it covers one of the three components. Perception needs a
-double-observer protocol, and the geometric blind spot is handled by
-left truncation or the gamma key.
-
-Correct for it at the abundance step, from external sources, with its
-standard error propagated and its components named separately: the
-geometric blind spot, availability, and perception are three different
-things, and correcting for one while believing you have corrected for
-another is how these estimates go wrong by a factor rather than a
-percentage.
-
-## Where this sits
+## Distance sampling to modeling pipeline
 
     distsamp   NARWC survey data  ->  effort segments + detection distances
        |

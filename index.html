@@ -146,8 +146,8 @@
 <div class="section level2">
 <h2 id="availability">Availability<a class="anchor" aria-label="anchor" href="#availability"></a>
 </h2>
-<p><code>g(0)</code> has three components, and they are different things: the <strong>geometric blind spot</strong> under the aircraft, <strong>availability</strong> (whether the animal was at the surface to be seen), and <strong>perception</strong> (whether an observer who could have seen it did). Correcting for one while believing you have corrected for another is how these estimates go wrong by a factor rather than a percentage.</p>
-<p>dsfit computes one of them. <code><a href="reference/availability.html">availability()</a></code> implements the Laake et al. (1997) equation from external dive data — surface and dive times, and the time an animal spends in view:</p>
+<p><code>g(0)</code> has three components: the <strong>geometric blind spot</strong> under the aircraft, <strong>availability</strong> (whether the animal was at the surface to be seen), and <strong>perception</strong> (whether an observer who could have seen it did). Correcting for one while believing you have corrected for another is how these estimates go wrong by a factor rather than a percentage.</p>
+<p>dsfit computes only availability. <code><a href="reference/availability.html">availability()</a></code> implements the Laake et al. (1997) equation from external dive data — surface and dive times, and the time an animal spends in view:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">a</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/availability.html">availability</a></span><span class="op">(</span>surface <span class="op">=</span> <span class="fl">2.4</span>, dive <span class="op">=</span> <span class="fl">8.1</span>, t_w <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></code></pre></div>
 <p>It <strong>computes; it does not estimate.</strong> There is no likelihood and no data being fitted — given dive parameters, the answer follows arithmetically, so its uncertainty is inherited from the dive study rather than from your survey. <code>ganley_surface_time()</code> carries the measured monthly surface times from Ganley et al. (2019), which vary enough month to month to rule out a constant.</p>
@@ -155,15 +155,7 @@
 <p>→ <a href="vignettes/availability.Rmd"><strong>Availability and the g(0) correction</strong></a> is the reference: the equation and the window it depends on, why availability is a function of the window rather than a number, the output shape and its standard error, which of the three built-in datasets are real, what a sweep needs before you run one, what your data can and cannot support, and how to record where each component came from.</p>
 </div>
 <div class="section level2">
-<h2 id="what-it-will-not-do">What it will not do<a class="anchor" aria-label="anchor" href="#what-it-will-not-do"></a>
-</h2>
-<p>Estimate <code>g(0)</code>. Every fit here conditions on the animal having been available and seen, and a mis-specified <code>g(0)</code> shifts every candidate in a set by the same factor — the ranking looks untouched while the density is wrong. It cannot be estimated from a standard NARWC extract, which records neither dive data nor the double-observer structure mark-recapture needs.</p>
-<p>Nor does it <strong>apply</strong> the correction <code><a href="reference/g0.html">g0()</a></code> builds. Dividing abundance by g(0) and carrying its CV through happens at the abundance step, in the analysis layer.</p>
-<p><code><a href="reference/availability.html">availability()</a></code> is not an exception to this: it is a calculation from external dive data, and it covers one of the three components. Perception needs a double-observer protocol, and the geometric blind spot is handled by left truncation or the gamma key.</p>
-<p>Correct for it at the abundance step, from external sources, with its standard error propagated and its components named separately: the geometric blind spot, availability, and perception are three different things, and correcting for one while believing you have corrected for another is how these estimates go wrong by a factor rather than a percentage.</p>
-</div>
-<div class="section level2">
-<h2 id="where-this-sits">Where this sits<a class="anchor" aria-label="anchor" href="#where-this-sits"></a>
+<h2 id="distance-sampling-to-modeling-pipeline">Distance sampling to modeling pipeline<a class="anchor" aria-label="anchor" href="#distance-sampling-to-modeling-pipeline"></a>
 </h2>
 <pre><code>distsamp   NARWC survey data  -&gt;  effort segments + detection distances
    |
