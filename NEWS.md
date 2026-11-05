@@ -333,6 +333,45 @@ Two things documented because they would otherwise be discovered the hard way:
   routinely, since `plotEffects()` forwards its own unresolved defaults.
   `match.arg()` rejects those outright, so the choices are resolved by hand.
 
+## Bug fixes
+
+* `esw` was `p` times the truncation width even when `left` was set, which
+  overstated it by `left / (width - left)` — about 8% at `left = 30,
+  truncation = 400`. It is now `p * (width - left)`, the strip `average.p` is
+  averaged over. The left-truncation snapshot moves accordingly; `p`, AIC and
+  the ranking do not.
+* A model `mrds` returned without converging stopped the whole sweep inside
+  `selection_table()`, because its summary has no `average.p`. It is now
+  recorded as a failure ("did not converge") and the rest of the table stands.
+  `converged` previously meant only "did not throw"; it now means converged.
+* `effect_estimates_ddf()` failed for hazard-rate and gamma keys, and recycled
+  silently for their covariate models: the shape design matrix was not
+  expanded to the evaluation grid alongside the scale one.
+* Binned data whose lowest break is above `left` (or above zero without one)
+  is refused, mirroring the existing top-bin guard. Derived breaks fall short
+  this way when the innermost bin had no detections, and a `left` inside a bin
+  dropped that bin's detections without saying so.
+* The bins-do-not-tile error named the wrong interval.
+* Distances `distsamp` derives from a break-off to circle are now checked.
+  `distance_source == "break_off"` is a slant distance from where the aircraft
+  left the line and is refused; `"circling"` is perpendicular but fixed
+  minutes after the detection, and is admitted with a warning that counts
+  it. `diagnose_sweep()` reports either. `distance_source` is no longer
+  offered as a covariate by `detection_structure()`.
+* Adjustment orders are cumulative, as in `Distance::ds()`. `order` is the
+  highest order of each candidate, which carries every term of its series up
+  to it: `model_set("hn", adjustment = "cos", order = 3)` fits
+  `adj.order = c(2, 3)`, where it previously fitted the order-3 term alone.
+  The series follow `Distance`: cosine from 2 (from 1 for `unif`), Hermite and
+  polynomial from 4 in steps of 2 (from 2 for `unif`). Orders outside a key's
+  series are dropped with a warning instead of failing inside `mrds`. Model
+  IDs name the orders: `hn+cos(2,3)`. The adjustment snapshot changes
+  accordingly; single-term candidates reproduce their previous AICs.
+* `model_set()` drops a uniform key with a covariate formula, with a warning.
+  The uniform key has no scale for a covariate to act on, and `mrds` ignored
+  the formula, so `unif+cos1 bf` fitted identically to `unif+cos1` and the
+  table carried a duplicate under a covariate label.
+
 ## Not yet built
 
 `g(0)` correction, the `dsm` handoff, plotting detectability against a

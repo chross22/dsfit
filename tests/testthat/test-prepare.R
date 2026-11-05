@@ -76,3 +76,70 @@ test_that("an object column is supplied when absent", {
   d <- data.frame(distance = c(10, 20))
   expect_true("object" %in% names(prepare_distance_data(d, truncation = 100)$data))
 })
+
+test_that("the tiling error names the interval before the gap", {
+  d <- data.frame(object = 1:5, distbegin = c(0, 100, 250, 300, 400),
+                  distend = c(100, 200, 300, 400, 500))
+  expect_error(prepare_distance_data(d, truncation = 500),
+               "interval 2 ends at 200 and the next begins at 250")
+})
+
+test_that("bins that start beyond zero are refused without `left`", {
+  # mrds integrates from zero, so 0-100 would be effort with no bin. This is
+  # what derived breaks give when the innermost bin had no detections.
+  d <- data.frame(object = 1:6, distbegin = rep(c(100, 200, 300), 2),
+                  distend = rep(c(200, 300, 400), 2))
+  expect_error(prepare_distance_data(d, truncation = 400),
+               "lowest bin begins at 100")
+
+  # Either remedy the message names works.
+  expect_silent(prepare_distance_data(d, truncation = 400, left = 100))
+  p <- prepare_distance_data(d, truncation = 400,
+                             breaks = c(0, 100, 200, 300, 400))
+  expect_equal(p$breaks, c(0, 100, 200, 300, 400))
+})
+
+test_that("a `left` that falls inside a bin is refused", {
+  # The 0-100 bin is dropped for beginning inside `left`, which would leave
+  # 50-100 searched but unbinned.
+  d <- data.frame(object = 1:6, distbegin = rep(c(0, 100, 200), 2),
+                  distend = rep(c(100, 200, 300), 2))
+  expect_error(prepare_distance_data(d, truncation = 300, left = 50),
+               "lowest bin begins at 100 but the fit starts at 50")
+  expect_silent(prepare_distance_data(d, truncation = 300, left = 100))
+})
+
+# A flatfile as `distsamp::detection_data(include_circling = TRUE)` leaves it:
+# mostly angle distances, with some from circling.
+with_sources <- function(sources) {
+  d <- data.frame(object = seq_along(sources),
+                  distance = seq(10, 300, length.out = length(sources)))
+  d$distance_source <- sources
+  d
+}
+
+test_that("break-off distances are refused: they are not perpendicular", {
+  d <- with_sources(c(rep("angle", 8), "break_off", "break_off"))
+  expect_error(prepare_distance_data(d, truncation = 400),
+               "2 distance\\(s\\) have `distance_source == \"break_off\"`")
+  expect_error(prepare_distance_data(d, truncation = 400), "not perpendicular")
+})
+
+test_that("circling distances are admitted with a warning that counts them", {
+  d <- with_sources(c(rep("angle", 8), "circling", NA))
+  expect_warning(p <- prepare_distance_data(d, truncation = 400),
+                 "1 distance\\(s\\) have `distance_source == \"circling\"`")
+  expect_equal(nrow(p$data), 10)
+})
+
+test_that("a circling row with no distance is dropped, not warned about", {
+  d <- with_sources(c(rep("angle", 8), "break_off", "circling"))
+  d$distance[9:10] <- NA
+  expect_silent(p <- prepare_distance_data(d, truncation = 400))
+  expect_equal(p$dropped[["no_distance"]], 2)
+})
+
+test_that("ordinary distance sources pass without comment", {
+  d <- with_sources(c(rep("angle", 5), rep("exact", 5)))
+  expect_silent(prepare_distance_data(d, truncation = 400))
+})

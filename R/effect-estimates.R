@@ -175,12 +175,20 @@ effect_estimates_ddf <- function(model, var = "distance",
 # which is only the intended answer when the scale is constant. The design
 # matrix is expanded here so that every pair is explicit.
 #
+# The shape design matrix is expanded alongside it. Hazard-rate and gamma keys
+# carry one, with a row per detection, and left at that length it no longer
+# matches the expanded scale: intercept-only fits fail outright and covariate
+# fits recycle.
+#
 # Rows are expanded once per *unique* covariate combination and weighted by how
 # often it occurs, so an intercept-only model costs one column rather than one
 # per detection.
 averaged_g <- function(ddfobj, x, width) {
   dm <- ddfobj$scale$dm
-  key <- do.call(paste, c(as.data.frame(dm), sep = "\r"))
+  shape_dm <- ddfobj$shape$dm
+  design <- as.data.frame(dm)
+  if (!is.null(shape_dm)) design <- cbind(design, as.data.frame(shape_dm))
+  key <- do.call(paste, c(unname(design), sep = "\r"))
   ukey <- unique(key)
   first <- match(ukey, key)
   weight <- tabulate(match(key, ukey), nbins = length(ukey))
@@ -191,6 +199,9 @@ averaged_g <- function(ddfobj, x, width) {
 
   obj <- ddfobj
   obj$scale$dm <- dm[rows, , drop = FALSE]
+  if (!is.null(shape_dm)) {
+    obj$shape$dm <- shape_dm[rows, , drop = FALSE]
+  }
   if (!is.null(ddfobj$xmat)) {
     obj$xmat <- ddfobj$xmat[rows, , drop = FALSE]
   }
@@ -244,7 +255,7 @@ covariate_object <- function(model, at) {
   ddfobj
 }
 
-# Delta method on the fitted parameters. Returns zeros with a warning when the
+# Delta method on the fitted parameters. Returns NA with a warning when the
 # Hessian will not invert, so a curve is still plotted rather than nothing.
 delta_se <- function(gfun, model) {
   n_x <- length(gfun(model$par))

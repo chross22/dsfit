@@ -34,6 +34,7 @@ reference:
   - prepare_distance_data
   - view_window
   - view_window_aerial
+  - view_window_vessel
 
 - title: Detection on the line
   desc: >

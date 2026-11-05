@@ -272,3 +272,99 @@ test_that("the measured season is threefold, which is the whole argument", {
   expect_equal(max(a), 0.91)
   expect_gt(max(a) / min(a), 3)
 })
+
+# A vessel's forward search arc --------------------------------------------
+
+test_that("a full forward search is half a circular patch", {
+  # The aft half of the chord is never searched: behind the beam there is
+  # nothing to see that has not already been counted.
+  for (d in c(0, 100, 200, 299)) {
+    expect_equal(
+      view_window_vessel(radius = 300, speed = 50, distance = d),
+      view_window(radius = 300, speed = 50, distance = d) / 2
+    )
+  }
+})
+
+test_that("a vessel's window shrinks with distance and closes at the radius", {
+  w <- view_window_vessel(radius = 6000, speed = 5, distance = c(0, 2000, 5000))
+  expect_true(all(diff(w) < 0))
+  expect_equal(view_window_vessel(radius = 6000, speed = 5, distance = 6000), 0)
+  expect_equal(view_window_vessel(radius = 6000, speed = 5, distance = 7000), 0)
+})
+
+test_that("a narrower search arc loses the animals furthest off the bow", {
+  # On the trackline the arc cannot matter - the animal is dead ahead however
+  # narrow the search is.
+  expect_equal(
+    view_window_vessel(radius = 6000, speed = 5, angle = 30),
+    view_window_vessel(radius = 6000, speed = 5, angle = 90)
+  )
+
+  # Off it, a narrower arc opens the window later and so shortens it.
+  wide <- view_window_vessel(radius = 6000, speed = 5, angle = 90,
+                             distance = 3000)
+  narrow <- view_window_vessel(radius = 6000, speed = 5, angle = 45,
+                               distance = 3000)
+  expect_lt(narrow, wide)
+
+  # And an animal too far off the bow to be searched before it draws abeam
+  # has no window at all, though it is well inside the radius.
+  expect_equal(
+    view_window_vessel(radius = 6000, speed = 5, angle = 20, distance = 5000),
+    0
+  )
+})
+
+test_that("the vessel geometry is the arithmetic it claims to be", {
+  # w = (sqrt(r^2 - x^2) - x/tan(theta)) / v, checked by hand at 45 degrees
+  # where tan is 1.
+  r <- 1000; x <- 600; v <- 5
+  expect_equal(
+    view_window_vessel(radius = r, speed = v, angle = 45, distance = x),
+    (sqrt(r^2 - x^2) - x) / v
+  )
+  # Twice the speed, half the time in view.
+  expect_equal(
+    view_window_vessel(radius = r, speed = 2 * v, distance = x),
+    view_window_vessel(radius = r, speed = v, distance = x) / 2
+  )
+})
+
+test_that("a vessel's window is not an aircraft's", {
+  # The sign of the distance effect is the whole distinction: a ship's sector
+  # closes with perpendicular distance, an aircraft's side-window wedge opens.
+  d <- c(0, 1000, 2000)
+  sea <- view_window_vessel(radius = 6000, speed = 5, distance = d)
+  air <- view_window_aerial(trackline = 51.22, speed = 5, slope = 0.03,
+                            distance = d)
+  expect_true(all(diff(sea) < 0))
+  expect_true(all(diff(air) > 0))
+})
+
+test_that("view_window_ship is view_window_vessel", {
+  expect_identical(view_window_ship, view_window_vessel)
+})
+
+test_that("impossible vessel geometry is refused", {
+  expect_error(view_window_vessel(radius = 0, speed = 5), "positive")
+  expect_error(view_window_vessel(radius = 6000, speed = 0), "point transect")
+  expect_error(view_window_vessel(radius = 6000, speed = 5, distance = -1),
+               "negative")
+  # A search reaching abaft the beam would count an animal already passed.
+  expect_error(view_window_vessel(radius = 6000, speed = 5, angle = 120),
+               "abaft the beam")
+  expect_error(view_window_vessel(radius = 6000, speed = 5, angle = 0),
+               "at most 90")
+})
+
+test_that("a vessel's window feeds availability the same way", {
+  r <- 6000; v <- 5
+  on_line <- availability(surface = 60, dive = 240,
+                          window = view_window_vessel(r, v, distance = 0))$value
+  off_line <- availability(
+    surface = 60, dive = 240,
+    window = view_window_vessel(r, v, distance = 5000)
+  )$value
+  expect_lt(off_line, on_line)
+})

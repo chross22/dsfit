@@ -13,8 +13,14 @@ model_set(key = c("hn", "hr"), adjustment = NULL, order = NULL, formula = ~1)
 \item{adjustment}{Adjustment series: \code{NULL} (none), \code{"cos"}, \code{"herm"}, or
 \code{"poly"}. A vector expands to one candidate per series.}
 
-\item{order}{Integer vector of adjustment orders. Ignored when \code{adjustment}
-is \code{NULL}.}
+\item{order}{Integer vector of highest adjustment orders, one candidate per
+element. Orders are cumulative, as in \code{Distance::ds()}: each candidate
+carries every term of its series up to \code{order}, so \code{order = 3} on
+\code{hn} with \code{"cos"} fits \code{adj.order = c(2, 3)}. The series are cosine
+2, 3, 4, ... (1, 2, 3, ... for \code{unif}) and Hermite or simple polynomial
+4, 6, 8, ... (2, 4, 6, ... for \code{unif}). \code{NULL} (default) gives one term,
+the first of the series. An order outside a key's series is dropped with
+a warning. Ignored when \code{adjustment} is \code{NULL}.}
 
 \item{formula}{One-sided formula, or a list of them, giving detection
 covariates. \code{~1} (default) is no covariates. Anything else fits through
@@ -36,7 +42,9 @@ usual default.}
 \item{\code{"hr"}}{Hazard-rate. A broader shoulder and a heavier tail, at the
 cost of a second parameter.}
 \item{\code{"unif"}}{Uniform. Detection certain out to the truncation distance —
-a strip transect. Only interesting with adjustment terms.}
+a strip transect. Only interesting with adjustment terms, and takes no
+covariates, having no scale parameter for them to act on. Both cases
+are dropped with a warning.}
 \item{\code{"gamma"}}{Gamma. \strong{Unimodal, with its peak away from zero}, so
 detection is lowest on the track-line. Not available in
 \code{Distance::ds()}, which is one reason this package fits through \code{mrds}
@@ -46,9 +54,10 @@ directly.}
 
 \section{When gamma is the right shape, and when it is a trap}{
 
-An aircraft cannot see the water directly beneath it. Where that is true the
-gamma key describes the survey rather than distorting it, and a half-normal
-forced through a peak at zero will misfit the near distances.
+An aircraft cannot see the water directly beneath it, and neither can a ship
+see past its own bow wave. Where that is true the gamma key describes the
+survey rather than distorting it, and a half-normal forced through a peak at
+zero will misfit the near distances.
 
 But a gamma key and a \strong{left truncation model the same phenomenon}. Using
 both accounts for the blind spot twice. Pick one deliberately and record

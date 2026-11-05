@@ -198,3 +198,21 @@ test_that("a clean survey reports no problems", {
                 truncation = 3000, left = NULL)
   expect_match(out, "No problems found")
 })
+
+test_that("circling distances are a WARN line, not an escaped R warning", {
+  d <- survey()
+  d$distance_source <- c("circling", rep("angle", nrow(d) - 1))
+  expect_no_warning(out <- paste(utils::capture.output(
+    diagnose_sweep(d, model_set("hn"), truncation = 3000)
+  ), collapse = "\n"))
+  expect_match(out, "WARN  1 distance\\(s\\) have `distance_source == \"circling\"`")
+  expect_match(out, "Problems above")
+})
+
+test_that("break-off distances stop the run at the guards", {
+  d <- survey()
+  d$distance_source <- c("break_off", rep("angle", nrow(d) - 1))
+  out <- report(d, model_set("hn"), truncation = 3000)
+  expect_match(out, "FAIL  1 distance\\(s\\) have `distance_source == \"break_off\"`")
+  expect_match(out, "would not reach `mrds`")
+})

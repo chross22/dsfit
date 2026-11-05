@@ -156,3 +156,37 @@ test_that("plotEffects draws a detection function with a rug", {
   p <- fancyfx::plotEffects(f, dat = f$data, var = "distance")
   expect_no_error(ggplot2::ggplot_build(p))
 })
+
+fit_key <- function(key, formula = ~1, n = 200, seed = 1) {
+  set.seed(seed)
+  d <- data.frame(object = seq_len(n), distance = abs(stats::rnorm(n, 0, 120)))
+  d <- d[d$distance < 400, , drop = FALSE]
+  d$bf <- stats::runif(nrow(d), 0, 5)
+  fn <- if (identical(formula, ~1)) "cds" else "mcds"
+  ds <- stats::as.formula(sprintf("~%s(key = \"%s\", formula = %s)", fn, key,
+                                  paste(deparse(formula), collapse = "")))
+  mrds::ddf(dsmodel = ds, data = d, method = "ds",
+            meta.data = list(width = 400))
+}
+
+test_that("keys with a shape parameter give a curve, not an error", {
+  # Hazard-rate and gamma carry a shape design matrix with a row per
+  # detection. Expanding only the scale matrix to the grid left the two
+  # different lengths, which failed for intercept-only fits.
+  for (key in c("hr", "gamma")) {
+    f <- fit_key(key)
+    est <- expect_no_warning(effect_estimates_ddf(f, n = 2000))
+    expect_equal(nrow(est), 2000, info = key)
+    expect_true(all(est$.estimate >= 0 & est$.estimate <= 1), info = key)
+    p_bar <- trapz(est$.x, est$.estimate) / diff(range(est$.x))
+    expect_equal(p_bar, summary(f)$average.p, tolerance = 1e-3, info = key)
+  }
+})
+
+test_that("a hazard-rate covariate model averages its curves without recycling", {
+  f <- fit_key("hr", ~bf)
+  est <- expect_no_warning(effect_estimates_ddf(f, n = 2000))
+  p_bar <- trapz(est$.x, est$.estimate) / diff(range(est$.x))
+  # The arithmetic mean over the animals, as for the half-normal case.
+  expect_equal(p_bar, mean(f$fitted), tolerance = 1e-3)
+})

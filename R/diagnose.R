@@ -116,9 +116,17 @@ diagnose_sweep <- function(data, models = NULL, truncation, left = NULL,
 
   # --- The guards, and what truncation costs -------------------------------
   header("Truncation")
+  # The guards' warnings are reported as WARN lines here, like every other
+  # finding, rather than escaping as R warnings after the report has printed.
   prepared <- tryCatch(
-    prepare_distance_data(data, truncation = truncation, left = left,
-                          breaks = breaks),
+    withCallingHandlers(
+      prepare_distance_data(data, truncation = truncation, left = left,
+                            breaks = breaks),
+      warning = function(w) {
+        warn(conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    ),
     error = function(e) {
       fail(conditionMessage(e))
       NULL
