@@ -43,8 +43,8 @@ Terms used throughout:
 |---|---|---|---|
 | 0 | `detection_structure()` (optional) | `R/structure.R:58` | what the data can support, by question |
 | 0 | `diagnose_sweep()` (optional) | `R/diagnose.R:42` | a printed report; nothing fitted |
-| 1 | `check_mrds()` | `R/sweep.R:333` | an error if `mrds` is absent |
-| 2 | `model_set()` | `R/model-set.R:77` | one row per candidate, with its `dsmodel` string |
+| 1 | `check_mrds()` | `R/sweep.R:334` | an error if `mrds` is absent |
+| 2 | `model_set()` | `R/model-set.R:85` | one row per candidate, with its `dsmodel` string |
 | 3 | `prepare_distance_data()` | `R/prepare.R:66` | `data`, `binned`, `breaks`, `n_dropped`, `dropped` |
 | 3a | `check_circling()` | `R/prepare.R:201` | an error or warning for circling-derived distances |
 | 3b | `derive_breaks()` | `R/prepare.R:237` | cutpoints, for binned data without `breaks` |
@@ -161,24 +161,23 @@ pair's end must equal the next pair's start. A gap or an overlap means the
 intervals define no single set of cutpoints, and is an error naming the first
 interval before the gap. The cutpoints are the sorted unique edges.
 
-## 4. `model_set()` — `R/model-set.R:77`
+## 4. `model_set()` — `R/model-set.R:85`
 
 ### 4.1 Validation and the grid
 
 Keys are checked against `hn`, `hr`, `unif`, `gamma`; adjustment series
-against `cos`, `herm`, `poly`. `order` defaults to `2` when an adjustment is
-given. `formula` is a formula or a list of them. `expand.grid()`
-(`R/model-set.R:107`) crosses key, adjustment, order and formula index.
+against `cos`, `herm`, `poly`. `order` must be whole numbers. `formula` is a formula or a list of them. `expand.grid()`
+(`R/model-set.R:118`) crosses key, adjustment, order and formula index.
 
 Two uniform-key candidates are removed with a warning. With no adjustment
-(`R/model-set.R:119`) it is a flat function, a strip transect, and fitting it
+(`R/model-set.R:130`) it is a flat function, a strip transect, and fitting it
 as a candidate is almost never what was meant. With a covariate formula
-(`R/model-set.R:137`) the formula has nothing to act on: covariates enter
+(`R/model-set.R:146`) the formula has nothing to act on: covariates enter
 through the scale parameter, which the uniform key lacks, and `mrds` ignores
 the formula rather than refusing it. Kept, the candidate would duplicate the
 uniform model without covariates under a covariate label.
 
-### 4.2 The `dsmodel` string — `build_dsmodel()`, `R/model-set.R:154`
+### 4.2 The `dsmodel` string — `build_dsmodel()`, `R/model-set.R:206`
 
 ```r
 fn <- if (covariate) "mcds" else "cds"
@@ -189,11 +188,30 @@ paste0("~", fn, "(key = \"", key, "\", formula = ", formula,
 A formula other than `~1` selects `mcds`. The string is stored in the table
 and passed to `stats::as.formula()` at fit time, so the model a row describes
 is readable without refitting. `label_model()` builds `model_id` as
-`key[+adjustment order][ covariates]`, for example `hn+cos2 bf`.
+`key[+adjustment(orders)][ covariates]`, for example `hn+cos(2,3) bf`.
 
-Each order is a separate candidate with a single adjustment term:
-`order = 2:3` gives `adj.order = 2` and `adj.order = 3`, not the cumulative
-`c(2, 3)` that `Distance::ds()` builds. See Section 11.
+### 4.3 Cumulative adjustment orders — `adjustment_orders()`, `R/model-set.R:236`
+
+```r
+if (adjustment == "cos") { start <- if (key == "unif") 1 else 2; step <- 1 }
+else                     { start <- if (key == "unif") 2 else 4; step <- 2 }
+if (is.na(max)) return(start)
+if (max < start || (max - start) %% step != 0) return(NULL)
+seq.int(start, max, by = step)
+```
+
+Each element of `order` is the highest order of one candidate, and the
+candidate carries every term of its series up to it, as `Distance::ds()` does
+(its internal `get_adj_orders()`). `order = 3` on `hn` with `"cos"` gives
+`adj.order = c(2, 3)`. With no `order`, each candidate has one term, the
+first of its series. The gamma key takes the `hn`/`hr` series; `Distance`
+does not offer it. An order outside the series is dropped with a warning
+naming it, rather than passed to `mrds`, where it failed.
+
+| Key | Cosine | Hermite, polynomial |
+|---|---|---|
+| `hn`, `hr`, `gamma` | 2, 3, 4, ... | 4, 6, 8, ... |
+| `unif` | 1, 2, 3, ... | 2, 4, 6, ... |
 
 ## 5. `sweep_models()` — `R/sweep.R:103`
 
@@ -424,13 +442,11 @@ every key.
 | The bins-do-not-tile error named interval `nrow(bins) - sum(gaps)`: "interval 4" for a gap after interval 2. | Names `which(gaps)[1]`. |
 | Circling-derived distances were fitted without comment, and `distance_source` was offered as a detection covariate. | `check_circling()` (Section 3.2); `distance_source` added to the structural columns. |
 | A uniform key with a covariate formula was accepted, and `mrds` ignored the formula: `unif+cos1 bf` and `unif+cos1` had the same parameter count (1) and AIC (1633.22). | Dropped with a warning by `model_set()`, as the uniform key with no adjustment already was. Test in `tests/testthat/test-model-set.R`. |
+| Adjustment orders were one term per candidate: `order = 3` fitted the order-3 cosine term alone, unlike `Distance::ds()`. Orders outside a key's series (`hn+herm2`, `unif+herm3`) were passed to `mrds` and failed. | Cumulative, by `adjustment_orders()` (Section 4.3); out-of-series orders dropped with a warning. On the adjustment snapshot `unif+cos` with orders 1 and 2 has AIC 2178.35 against 2379.98 for the order-2 term alone. |
 | The comment on `delta_se()` said it returned zeros when the Hessian does not invert. It returns `NA`. | Comment corrected. |
 
 ## 11. Limitations
 
-- Adjustment orders are not cumulative (Section 4.2). `hn+cos3` contains the
-  order-3 cosine term alone, which differs from `Distance::ds()` and from
-  the usual forward-selection practice.
 - `onset_shape()` uses `distbegin` for binned data, where a 20-bin histogram
   of bin starts carries little information about the onset. Its verdict is
   meaningful for exact distances only.
@@ -453,17 +469,16 @@ every key.
 | Hazard-rate and gamma curves, before fix | Both stopped with "non-conformable arguments"; half-normal correct (mean 0.3509 against `average.p` 0.3494 on a 100-point grid) |
 | `esw` under `left = 50`, `truncation = 400`, before fix | 104.9 reported; `p * (width - left)` = 91.8 |
 | Bins 100–400 with no `left`, before fix | Fitted with `left = 0`, `int.range = (0, 400)` |
-| `R CMD check --no-manual`, after fixes | 0 errors, 0 warnings, 1 note (unchanged); 429 expectations pass, 0 fail, 0 test warnings |
+| `R CMD check --no-manual`, after fixes | 0 errors, 0 warnings, 1 note (unchanged); 446 expectations pass, 0 fail, 0 test warnings |
+| `hn+cos(2,3)` against `Distance::ds(order = c(2, 3))` | AIC 2179.705 both; 3 parameters |
 | Uniform key with a covariate, before fix | `unif+cos1 bf` and `unif+cos1`: 1 parameter each, AIC 1633.22 each |
 
 ## 13. Planned work
 
-1. Decide whether adjustment orders should be cumulative, and either change
-   `model_set()` or state the convention in its help (Section 11).
-2. Add the pkgdown files to `.Rbuildignore`, which clears the remaining note.
-3. Make `g0()`'s message name a missing `key` when every row of a component is
+1. Add the pkgdown files to `.Rbuildignore`, which clears the remaining note.
+2. Make `g0()`'s message name a missing `key` when every row of a component is
    unkeyed.
-4. Sweep a real extract end to end, from `distsamp::detection_data()`.
+3. Sweep a real extract end to end, from `distsamp::detection_data()`.
 
 ## 14. References
 

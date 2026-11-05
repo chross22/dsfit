@@ -13,8 +13,14 @@ model_set(key = c("hn", "hr"), adjustment = NULL, order = NULL, formula = ~1)
 \item{adjustment}{Adjustment series: \code{NULL} (none), \code{"cos"}, \code{"herm"}, or
 \code{"poly"}. A vector expands to one candidate per series.}
 
-\item{order}{Integer vector of adjustment orders. Ignored when \code{adjustment}
-is \code{NULL}.}
+\item{order}{Integer vector of highest adjustment orders, one candidate per
+element. Orders are cumulative, as in \code{Distance::ds()}: each candidate
+carries every term of its series up to \code{order}, so \code{order = 3} on
+\code{hn} with \code{"cos"} fits \code{adj.order = c(2, 3)}. The series are cosine
+2, 3, 4, ... (1, 2, 3, ... for \code{unif}) and Hermite or simple polynomial
+4, 6, 8, ... (2, 4, 6, ... for \code{unif}). \code{NULL} (default) gives one term,
+the first of the series. An order outside a key's series is dropped with
+a warning. Ignored when \code{adjustment} is \code{NULL}.}
 
 \item{formula}{One-sided formula, or a list of them, giving detection
 covariates. \code{~1} (default) is no covariates. Anything else fits through

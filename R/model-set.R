@@ -38,8 +38,14 @@
 #'   `"unif"`, `"gamma"`.
 #' @param adjustment Adjustment series: `NULL` (none), `"cos"`, `"herm"`, or
 #'   `"poly"`. A vector expands to one candidate per series.
-#' @param order Integer vector of adjustment orders. Ignored when `adjustment`
-#'   is `NULL`.
+#' @param order Integer vector of highest adjustment orders, one candidate per
+#'   element. Orders are cumulative, as in `Distance::ds()`: each candidate
+#'   carries every term of its series up to `order`, so `order = 3` on
+#'   `hn` with `"cos"` fits `adj.order = c(2, 3)`. The series are cosine
+#'   2, 3, 4, ... (1, 2, 3, ... for `unif`) and Hermite or simple polynomial
+#'   4, 6, 8, ... (2, 4, 6, ... for `unif`). `NULL` (default) gives one term,
+#'   the first of the series. An order outside a key's series is dropped with
+#'   a warning. Ignored when `adjustment` is `NULL`.
 #' @param formula One-sided formula, or a list of them, giving detection
 #'   covariates. `~1` (default) is no covariates. Anything else fits through
 #'   `mcds` rather than `cds`.
@@ -98,7 +104,10 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
         paste0("\"", known_adj, "\"", collapse = ", "), "."
       ))
     }
-    if (is.null(order)) order <- 2L
+    if (!is.null(order) &&
+        (!is.numeric(order) || anyNA(order) || any(order != round(order)))) {
+      rlang::abort("`order` must be whole numbers.")
+    }
   }
 
   formulas <- if (inherits(formula, "formula")) list(formula) else formula
@@ -109,7 +118,7 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
   grid <- expand.grid(
     key = key,
     adjustment = if (is.null(adjustment)) NA_character_ else adjustment,
-    order = if (is.null(adjustment)) NA_integer_ else order,
+    order = if (is.null(adjustment) || is.null(order)) NA_integer_ else order,
     formula_i = seq_along(formulas),
     stringsAsFactors = FALSE,
     KEEP.OUT.ATTRS = FALSE
@@ -129,8 +138,8 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
   }
 
   # Covariates act on the key's scale parameter, and the uniform key has none.
-  # mrds accepts the formula and ignores it, so `unif+cos1 bf` fits as
-  # `unif+cos1` - same parameters, same AIC - and the table would carry a
+  # mrds accepts the formula and ignores it, so `unif+cos(1) bf` fits as
+  # `unif+cos(1)` - same parameters, same AIC - and the table would carry a
   # duplicate labelled as a covariate model.
   form_chr <- vapply(formulas, deparse_formula, character(1))
   covariate <- !vapply(trimws(form_chr), identical, logical(1), "~1")
@@ -144,6 +153,27 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
     ))
     grid <- grid[!drop, , drop = FALSE]
   }
+
+  # Adjustment orders are cumulative, as in Distance::ds(): a candidate carries
+  # every term of its series up to its order. An order outside the series - a
+  # cosine order 1 on a key that already has the first term's shape, or an odd
+  # Hermite order - is not a model mrds can fit, and failed inside it.
+  adj <- !is.na(grid$adjustment)
+  grid$orders <- vector("list", nrow(grid))
+  grid$orders[adj] <- Map(adjustment_orders, grid$key[adj],
+                          grid$adjustment[adj], grid$order[adj])
+  drop <- adj & vapply(grid$orders, is.null, logical(1))
+  if (any(drop)) {
+    bad <- unique(paste0(grid$key[drop], "+", grid$adjustment[drop],
+                         grid$order[drop]))
+    rlang::warn(paste0(
+      "Dropping adjustment order(s) outside their series: ",
+      paste(bad, collapse = ", "), ". Cosine orders run 2, 3, ... (1, 2, ... ",
+      "for unif); Hermite and polynomial orders run 4, 6, ... (2, 4, ... for ",
+      "unif)."
+    ))
+    grid <- grid[!drop, , drop = FALSE]
+  }
   if (!nrow(grid)) {
     rlang::abort("No candidate models left after validation.")
   }
@@ -151,14 +181,18 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
   out <- tibble::tibble(
     key = grid$key,
     adjustment = grid$adjustment,
-    order = as.integer(grid$order),
+    order = vapply(grid$orders, function(o) {
+      if (is.null(o)) NA_integer_ else as.integer(max(o))
+    }, integer(1)),
     formula = form_chr[grid$formula_i]
   )
   out$dsmodel <- vapply(seq_len(nrow(out)), function(i) {
-    build_dsmodel(out$key[i], out$adjustment[i], out$order[i], out$formula[i])
+    build_dsmodel(out$key[i], out$adjustment[i], grid$orders[[i]],
+                  out$formula[i])
   }, character(1))
   out$model_id <- vapply(seq_len(nrow(out)), function(i) {
-    label_model(out$key[i], out$adjustment[i], out$order[i], out$formula[i])
+    label_model(out$key[i], out$adjustment[i], grid$orders[[i]],
+                out$formula[i])
   }, character(1))
 
   out[, c("model_id", "key", "adjustment", "order", "formula", "dsmodel")]
@@ -180,16 +214,39 @@ build_dsmodel <- function(key, adjustment, order, formula) {
   if (!is.na(adjustment)) {
     parts <- c(parts,
                paste0("adj.series = \"", adjustment, "\""),
-               paste0("adj.order = ", order))
+               paste0("adj.order = ", format_orders(order)))
   }
   paste0("~", fn, "(", paste(parts, collapse = ", "), ")")
 }
 
 label_model <- function(key, adjustment, order, formula) {
   out <- key
-  if (!is.na(adjustment)) out <- paste0(out, "+", adjustment, order)
+  if (!is.na(adjustment)) {
+    out <- paste0(out, "+", adjustment, "(", paste(order, collapse = ","), ")")
+  }
   if (!identical(trimws(formula), "~1")) {
     out <- paste0(out, " ", sub("^~", "", trimws(formula)))
   }
   out
+}
+
+# The orders a candidate carries, following Distance's get_adj_orders(): the
+# series for the key and adjustment, up to `max`. `NA` gives the first term
+# alone. NULL when `max` is not in the series.
+adjustment_orders <- function(key, adjustment, max) {
+  if (adjustment == "cos") {
+    start <- if (key == "unif") 1L else 2L
+    step <- 1L
+  } else {
+    start <- if (key == "unif") 2L else 4L
+    step <- 2L
+  }
+  if (is.na(max)) return(start)
+  if (max < start || (max - start) %% step != 0) return(NULL)
+  seq.int(start, max, by = step)
+}
+
+format_orders <- function(order) {
+  if (length(order) == 1L) as.character(order) else
+    paste0("c(", paste(order, collapse = ", "), ")")
 }

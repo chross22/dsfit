@@ -358,6 +358,15 @@ Two things documented because they would otherwise be discovered the hard way:
   minutes after the detection, and is admitted with a warning that counts
   it. `diagnose_sweep()` reports either. `distance_source` is no longer
   offered as a covariate by `detection_structure()`.
+* Adjustment orders are cumulative, as in `Distance::ds()`. `order` is the
+  highest order of each candidate, which carries every term of its series up
+  to it: `model_set("hn", adjustment = "cos", order = 3)` fits
+  `adj.order = c(2, 3)`, where it previously fitted the order-3 term alone.
+  The series follow `Distance`: cosine from 2 (from 1 for `unif`), Hermite and
+  polynomial from 4 in steps of 2 (from 2 for `unif`). Orders outside a key's
+  series are dropped with a warning instead of failing inside `mrds`. Model
+  IDs name the orders: `hn+cos(2,3)`. The adjustment snapshot changes
+  accordingly; single-term candidates reproduce their previous AICs.
 * `model_set()` drops a uniform key with a covariate formula, with a warning.
   The uniform key has no scale for a covariate to act on, and `mrds` ignored
   the formula, so `unif+cos1 bf` fitted identically to `unif+cos1` and the

@@ -13,15 +13,26 @@
     Code
       snap_table(sw)
     Output
-             model converged n_par     aic delta_aic      p  p_cv   esw cvm_p chisq_p
-      1    hn+cos3      TRUE     2 2178.51      0.00 0.3278 0.099 131.1 0.916   0.634
-      2    hn+cos2      TRUE     2 2179.05      0.54 0.3488 0.084 139.5 0.932   0.530
-      3 unif+herm2      TRUE     1 2272.10     93.59 0.6674 0.082 267.0 0.001   0.000
-      4  unif+cos2      TRUE     1 2379.98    201.46 0.7043 0.064 281.7 0.012   0.000
-      5  unif+cos3      TRUE     1 2396.71    218.20 0.8776 0.089 351.0 0.020   0.000
-      6   hn+herm2     FALSE    NA      NA        NA     NA    NA    NA    NA      NA
-      7   hn+herm3     FALSE    NA      NA        NA     NA    NA    NA    NA      NA
-      8 unif+herm3     FALSE    NA      NA        NA     NA    NA    NA    NA      NA
+                    model converged n_par     aic delta_aic      p  p_cv   esw cvm_p
+      1   unif+cos(1,2,3)      TRUE     3 2176.96      0.00 0.3363 0.074 134.5 0.965
+      2     unif+cos(1,2)      TRUE     2 2178.35      1.40 0.3775 0.053 151.0 0.360
+      3 unif+cos(1,2,3,4)      TRUE     4 2178.85      1.89 0.3435 0.101 137.4 0.968
+      4        hn+herm(4)      TRUE     2 2178.98      2.02 0.3534 0.082 141.3 0.891
+      5         hn+cos(2)      TRUE     2 2179.05      2.10 0.3488 0.084 139.5 0.932
+      6       hn+cos(2,3)      TRUE     3 2179.71      2.75 0.3244 0.108 129.7 0.909
+      7     hn+cos(2,3,4)      TRUE     4 2180.34      3.38 0.3510 0.137 140.4 0.988
+      8      unif+herm(2)      TRUE     1 2272.10     95.15 0.6674 0.082 267.0 0.001
+      9    unif+herm(2,4)     FALSE    NA      NA        NA     NA    NA    NA    NA
+        chisq_p
+      1   0.660
+      2   0.487
+      3   0.521
+      4   0.521
+      5   0.530
+      6   0.598
+      7   0.651
+      8   0.000
+      9      NA
 
 # the binned likelihood is stable
 

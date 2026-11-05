@@ -111,21 +111,22 @@ test_that("a model that fails to fit is recorded, not fatal", {
 })
 
 test_that("a failed fit does not slide the other models onto wrong rows", {
-  # Somewhere in this set a model does not converge, which is the point: the
-  # rows after it have to keep their own AICs. A `fits[[i]] <- NULL` shortens
-  # the list instead of emptying it, and every later model inherits the
-  # previous one's fit.
+  # The failures come first, so every model that fits sits after one: a
+  # `fits[[i]] <- NULL` shortens the list instead of emptying it, and every
+  # later model inherits the previous one's fit. A covariate that is not in
+  # the data fails inside mrds every time, which makes the failure certain.
   sw <- suppressWarnings(sweep_fx(
     exact_data(),
-    model_set(key = c("hn", "unif"), adjustment = c("cos", "herm"),
-              order = 2:3),
+    model_set(key = c("hn", "hr"), adjustment = "cos", order = 2:3,
+              formula = list(~absent, ~1)),
     truncation = 400
   ))
   tab <- sw$table
 
   expect_equal(nrow(tab), 8)
   expect_equal(length(sw$fits), 8)
-  expect_true(any(!tab$converged))
+  expect_equal(sum(!tab$converged), 4)
+  expect_true(all(grepl("absent", tab$model_id[!tab$converged])))
   expect_true(all(is.na(tab$aic[!tab$converged])))
 
   # Each row's AIC is the AIC of the fit stored under that row's model_id.
@@ -188,6 +189,19 @@ test_that("one unconverged model leaves the others in the table", {
   tab <- sw$table
   expect_equal(nrow(tab), 2)
   expect_equal(tab$converged[tab$model_id == "hr"], FALSE)
+})
+
+test_that("a cumulative adjustment fits the model mrds gives for those orders", {
+  d <- exact_data()
+  sw <- sweep_fx(d, model_set("hn", adjustment = "cos", order = 3),
+                 truncation = 400)
+  direct <- mrds::ddf(
+    dsmodel = ~cds(key = "hn", formula = ~1, adj.series = "cos",
+                   adj.order = c(2, 3)),
+    data = d, method = "ds", meta.data = list(width = 400)
+  )
+  expect_equal(sw$table$aic, direct$criterion)
+  expect_equal(sw$table$n_par, 3)
 })
 
 test_that("esw is p times the searched width when left truncation is set", {

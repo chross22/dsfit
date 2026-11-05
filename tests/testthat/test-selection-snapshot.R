@@ -53,7 +53,7 @@ test_that("the ranking over adjustment series and orders is stable", {
   sw <- suppressWarnings(sweep_models(
     exact_data(),
     model_set(key = c("hn", "unif"), adjustment = c("cos", "herm"),
-              order = 2:3),
+              order = 2:4),
     truncation = 400,
     quiet = TRUE
   ))
