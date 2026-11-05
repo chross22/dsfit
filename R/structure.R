@@ -115,7 +115,8 @@ detection_structure <- function(data) {
   vocab <- narwc_vocabulary()
   structural <- c("object", "distance", "distbegin", "distend", "observer",
                   "detected", "size", "Region.Label", "Area", "Sample.Label",
-                  "Effort", "detected_by", "sample", vocab$structural)
+                  "Effort", "detected_by", "sample", "distance_source",
+                  vocab$structural)
 
   canonical <- vapply(nm, function(x) {
     hit <- vocab$aliases[[toupper(x)]]

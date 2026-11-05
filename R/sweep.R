@@ -317,7 +317,8 @@ report_sweep <- function(x) {
   if (x$settings$n_dropped > 0) {
     lines <- c(lines, paste0(
       "  ", x$settings$n_dropped,
-      " row(s) dropped: no distance, or beyond the truncation."
+      " row(s) dropped: no distance, or beyond the truncation",
+      if (!is.null(x$settings$left)) ", or inside `left`" else "", "."
     ))
   }
   if (length(x$settings$failures)) {

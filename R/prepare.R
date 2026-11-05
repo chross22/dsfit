@@ -25,7 +25,18 @@
 #'     lowest break must equal `left`, or zero without it. Derived breaks fall
 #'     short when the innermost bin had no detections, and a `left` inside a
 #'     bin drops that bin's detections; supply `breaks` in either case.}
+#'   \item{Break-off distances}{`distance_source == "break_off"`, which
+#'     `distsamp` gives a circling sighting with no exact position: a slant
+#'     distance from where the aircraft left the line, not a perpendicular
+#'     one.}
 #' }
+#'
+#' @section What it warns about:
+#' `distance_source == "circling"`: a circling sighting's exact position
+#' projected onto the census line. The right quantity, but fixed minutes after
+#' the detection, and excluded by `distsamp::detection_data()` unless
+#' `include_circling = TRUE`. Admitted, with the count, so the choice is made
+#' knowingly.
 #'
 #' @section What it drops, and reports:
 #' Rows with no distance at all — which is how a flatfile records a sample that
@@ -81,6 +92,8 @@ prepare_distance_data <- function(data, truncation, left = NULL,
       "and sweep each separately."
     ))
   }
+
+  check_circling(data)
 
   n0 <- nrow(data)
 
@@ -170,6 +183,52 @@ prepare_distance_data <- function(data, truncation, left = NULL,
 
   list(data = ensure_object(data), binned = FALSE, breaks = NULL,
        n_dropped = n0 - nrow(data), dropped = dropped)
+}
+
+# Distances `distsamp` derives from a break-off to circle, which
+# `detection_data()` excludes unless `include_circling = TRUE`. They differ in
+# kind, and are treated accordingly:
+#
+# - "break_off" is the great-circle distance from where the aircraft left the
+#   line to where the record was logged. It is not perpendicular to anything,
+#   so it is not the quantity a detection function is defined on. Refused.
+# - "circling" is an exact position projected onto the census line: the right
+#   quantity, but fixed minutes after the detection, after the animal and the
+#   aircraft have both moved. Admitted, with a warning naming the count.
+#
+# Only distances that would be fitted are counted; a circling row with no
+# distance is dropped with the rest of the missing ones.
+check_circling <- function(data) {
+  if (!"distance_source" %in% names(data) || !"distance" %in% names(data)) {
+    return(invisible(NULL))
+  }
+  src <- as.character(data$distance_source)
+  fitted <- !is.na(data$distance)
+
+  n_break <- sum(fitted & src %in% "break_off")
+  if (n_break > 0) {
+    rlang::abort(paste0(
+      n_break, " distance(s) have `distance_source == \"break_off\"`: slant ",
+      "distances from where the aircraft broke off to circle, not ",
+      "perpendicular distances, so not what a detection function is defined ",
+      "on. Drop them before fitting (they still count towards abundance in ",
+      "`distsamp`'s segments), e.g. ",
+      "`data[!data$distance_source %in% \"break_off\", ]`."
+    ))
+  }
+
+  n_circ <- sum(fitted & src %in% "circling")
+  if (n_circ > 0) {
+    rlang::warn(paste0(
+      n_circ, " distance(s) have `distance_source == \"circling\"`: ",
+      "perpendicular, but from a position fixed minutes after the detection. ",
+      "`distsamp::detection_data()` excludes them by default. They are the ",
+      "close or conspicuous groups worth breaking off for, so keeping or ",
+      "dropping them moves the near end of the distance distribution - state ",
+      "which in the methods."
+    ))
+  }
+  invisible(NULL)
 }
 
 # Cutpoints implied by the bins present. They have to tile: a gap or an overlap

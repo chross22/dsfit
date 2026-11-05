@@ -352,6 +352,16 @@ Two things documented because they would otherwise be discovered the hard way:
   this way when the innermost bin had no detections, and a `left` inside a bin
   dropped that bin's detections without saying so.
 * The bins-do-not-tile error named the wrong interval.
+* Distances `distsamp` derives from a break-off to circle are now checked.
+  `distance_source == "break_off"` is a slant distance from where the aircraft
+  left the line and is refused; `"circling"` is perpendicular but fixed
+  minutes after the detection, and is admitted with a warning that counts
+  it. `diagnose_sweep()` reports either. `distance_source` is no longer
+  offered as a covariate by `detection_structure()`.
+* `model_set()` drops a uniform key with a covariate formula, with a warning.
+  The uniform key has no scale for a covariate to act on, and `mrds` ignored
+  the formula, so `unif+cos1 bf` fitted identically to `unif+cos1` and the
+  table carried a duplicate under a covariate label.
 
 ## Not yet built
 

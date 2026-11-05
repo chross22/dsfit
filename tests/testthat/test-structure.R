@@ -285,3 +285,13 @@ test_that("an unrelated column ending in _ORIGINAL is left alone", {
   d$notes_ORIGINAL <- rep(c("a", "b"), 60)
   expect_true("notes_ORIGINAL" %in% detection_structure(d)$summary$covariates)
 })
+
+test_that("distance_source is provenance, not a covariate", {
+  # It varies in exactly the case that matters - a flatfile mixing angle,
+  # exact and circling distances - and that is when it must not be offered.
+  set.seed(1)
+  d <- data.frame(object = 1:100, distance = abs(stats::rnorm(100, 0, 120)),
+                  distance_source = rep(c("angle", "exact"), 50))
+  s <- detection_structure(d)
+  expect_false("distance_source" %in% s$summary$covariates)
+})

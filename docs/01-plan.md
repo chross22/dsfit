@@ -81,7 +81,11 @@ invalidates a ranking rather than failing:
 | No unbounded top bin | Cannot be fitted at all | error |
 | Bins must tile | Otherwise they define no cutpoints | error |
 | Bins must reach the truncation | Otherwise there is unaccounted effort between the last bin and the width | error |
+| Bins must start at `left` (or 0) | Otherwise there is unaccounted effort between the start of the fit and the first bin | error |
+| No break-off distances | `distance_source == "break_off"` is a slant distance, not a perpendicular one | error |
+| Circling distances are flagged | `distance_source == "circling"` is perpendicular but fixed minutes after detection | warn |
 | Uniform key needs adjustments | A flat detection function is a strip transect | warn and drop |
+| Uniform key takes no covariates | It has no scale parameter, and `mrds` ignores the formula | warn and drop |
 | Gamma and left truncation are alternatives | Both model the blind spot | warn |
 
 ### Ranking on more than AIC

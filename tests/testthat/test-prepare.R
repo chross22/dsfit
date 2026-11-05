@@ -108,3 +108,38 @@ test_that("a `left` that falls inside a bin is refused", {
                "lowest bin begins at 100 but the fit starts at 50")
   expect_silent(prepare_distance_data(d, truncation = 300, left = 100))
 })
+
+# A flatfile as `distsamp::detection_data(include_circling = TRUE)` leaves it:
+# mostly angle distances, with some from circling.
+with_sources <- function(sources) {
+  d <- data.frame(object = seq_along(sources),
+                  distance = seq(10, 300, length.out = length(sources)))
+  d$distance_source <- sources
+  d
+}
+
+test_that("break-off distances are refused: they are not perpendicular", {
+  d <- with_sources(c(rep("angle", 8), "break_off", "break_off"))
+  expect_error(prepare_distance_data(d, truncation = 400),
+               "2 distance\\(s\\) have `distance_source == \"break_off\"`")
+  expect_error(prepare_distance_data(d, truncation = 400), "not perpendicular")
+})
+
+test_that("circling distances are admitted with a warning that counts them", {
+  d <- with_sources(c(rep("angle", 8), "circling", NA))
+  expect_warning(p <- prepare_distance_data(d, truncation = 400),
+                 "1 distance\\(s\\) have `distance_source == \"circling\"`")
+  expect_equal(nrow(p$data), 10)
+})
+
+test_that("a circling row with no distance is dropped, not warned about", {
+  d <- with_sources(c(rep("angle", 8), "break_off", "circling"))
+  d$distance[9:10] <- NA
+  expect_silent(p <- prepare_distance_data(d, truncation = 400))
+  expect_equal(p$dropped[["no_distance"]], 2)
+})
+
+test_that("ordinary distance sources pass without comment", {
+  d <- with_sources(c(rep("angle", 5), rep("exact", 5)))
+  expect_silent(prepare_distance_data(d, truncation = 400))
+})

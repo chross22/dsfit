@@ -50,6 +50,24 @@ test_that("a uniform key with no adjustment is dropped, with a reason", {
   expect_equal(keep$key, "unif")
 })
 
+test_that("a uniform key with covariates is dropped, with a reason", {
+  # Covariates act on the scale, which the uniform key lacks. mrds ignores the
+  # formula, so the candidate would duplicate unif+cos1 under a covariate label.
+  expect_warning(
+    ms <- model_set(key = c("hn", "unif"), adjustment = "cos", order = 2,
+                    formula = list(~1, ~bf)),
+    "does not have"
+  )
+  expect_setequal(ms$model_id, c("hn+cos2", "hn+cos2 bf", "unif+cos2"))
+
+  # Without covariates it stays.
+  expect_silent(model_set(key = "unif", adjustment = "cos", formula = ~1))
+  expect_error(
+    suppressWarnings(model_set(key = "unif", adjustment = "cos", formula = ~bf)),
+    "No candidate models"
+  )
+})
+
 test_that("nothing is left is an error, not an empty tibble", {
   expect_error(suppressWarnings(model_set(key = "unif")), "No candidate models")
 })

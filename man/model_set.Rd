@@ -36,7 +36,9 @@ usual default.}
 \item{\code{"hr"}}{Hazard-rate. A broader shoulder and a heavier tail, at the
 cost of a second parameter.}
 \item{\code{"unif"}}{Uniform. Detection certain out to the truncation distance —
-a strip transect. Only interesting with adjustment terms.}
+a strip transect. Only interesting with adjustment terms, and takes no
+covariates, having no scale parameter for them to act on. Both cases
+are dropped with a warning.}
 \item{\code{"gamma"}}{Gamma. \strong{Unimodal, with its peak away from zero}, so
 detection is lowest on the track-line. Not available in
 \code{Distance::ds()}, which is one reason this package fits through \code{mrds}

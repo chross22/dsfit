@@ -10,7 +10,9 @@
 #'   \item{`"hr"`}{Hazard-rate. A broader shoulder and a heavier tail, at the
 #'     cost of a second parameter.}
 #'   \item{`"unif"`}{Uniform. Detection certain out to the truncation distance —
-#'     a strip transect. Only interesting with adjustment terms.}
+#'     a strip transect. Only interesting with adjustment terms, and takes no
+#'     covariates, having no scale parameter for them to act on. Both cases
+#'     are dropped with a warning.}
 #'   \item{`"gamma"`}{Gamma. **Unimodal, with its peak away from zero**, so
 #'     detection is lowest on the track-line. Not available in
 #'     `Distance::ds()`, which is one reason this package fits through `mrds`
@@ -125,11 +127,27 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
     ))
     grid <- grid[!drop, , drop = FALSE]
   }
+
+  # Covariates act on the key's scale parameter, and the uniform key has none.
+  # mrds accepts the formula and ignores it, so `unif+cos1 bf` fits as
+  # `unif+cos1` - same parameters, same AIC - and the table would carry a
+  # duplicate labelled as a covariate model.
+  form_chr <- vapply(formulas, deparse_formula, character(1))
+  covariate <- !vapply(trimws(form_chr), identical, logical(1), "~1")
+  drop <- grid$key == "unif" & covariate[grid$formula_i]
+  if (any(drop)) {
+    rlang::warn(paste0(
+      "Dropping the uniform key with a covariate formula: covariates act on ",
+      "the scale parameter, which the uniform key does not have, so `mrds` ",
+      "ignores the formula and the fit duplicates the uniform model without ",
+      "it. Use a key with a scale (\"hn\", \"hr\", \"gamma\") for covariates."
+    ))
+    grid <- grid[!drop, , drop = FALSE]
+  }
   if (!nrow(grid)) {
     rlang::abort("No candidate models left after validation.")
   }
 
-  form_chr <- vapply(formulas, deparse_formula, character(1))
   out <- tibble::tibble(
     key = grid$key,
     adjustment = grid$adjustment,

@@ -49,7 +49,20 @@ fit describes a narrower survey than the one flown.}
 lowest break must equal \code{left}, or zero without it. Derived breaks fall
 short when the innermost bin had no detections, and a \code{left} inside a
 bin drops that bin's detections; supply \code{breaks} in either case.}
+\item{Break-off distances}{\code{distance_source == "break_off"}, which
+\code{distsamp} gives a circling sighting with no exact position: a slant
+distance from where the aircraft left the line, not a perpendicular
+one.}
 }
+}
+
+\section{What it warns about}{
+
+\code{distance_source == "circling"}: a circling sighting's exact position
+projected onto the census line. The right quantity, but fixed minutes after
+the detection, and excluded by \code{distsamp::detection_data()} unless
+\code{include_circling = TRUE}. Admitted, with the count, so the choice is made
+knowingly.
 }
 
 \section{What it drops, and reports}{
