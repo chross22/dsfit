@@ -161,3 +161,40 @@ test_that("printing shows the ranking and the caveat", {
   expect_match(out, "esw")
   expect_match(out, "g\\(0\\) = 1 is assumed")
 })
+
+test_that("a fit mrds returns unconverged is a failure, not a crash", {
+  # mrds warns rather than errors when the optimiser does not converge, and
+  # hands back an object whose summary has no average.p. That used to stop
+  # the whole sweep inside the selection table. mrds draws random starting
+  # values, so whether three points converge depends on the seed; this one
+  # does not.
+  d <- data.frame(object = 1:3, distance = c(1, 2, 3))
+  set.seed(1)
+  sw <- suppressWarnings(sweep_fx(d, model_set("hr"), truncation = 400))
+  tab <- sw$table
+
+  expect_false(tab$converged)
+  expect_true(is.na(tab$aic))
+  expect_true(is.na(tab$delta_aic))
+  expect_null(sw$fits[["hr"]])
+  expect_equal(unname(sw$settings$failures), "did not converge")
+})
+
+test_that("one unconverged model leaves the others in the table", {
+  d <- data.frame(object = 1:3, distance = c(1, 2, 3))
+  set.seed(1)
+  sw <- suppressWarnings(sweep_fx(d, model_set(c("hn", "hr")),
+                                  truncation = 400))
+  tab <- sw$table
+  expect_equal(nrow(tab), 2)
+  expect_equal(tab$converged[tab$model_id == "hr"], FALSE)
+})
+
+test_that("esw is p times the searched width when left truncation is set", {
+  # average.p is the mean of g(x) over (left, width), so the strip it scales
+  # is width - left. Multiplying by width alone overstates esw, and density
+  # with it.
+  sw <- sweep_fx(exact_data(), model_set("hn"), truncation = 400, left = 50)
+  tab <- selection_table(sw)
+  expect_equal(tab$esw, tab$p * (400 - 50))
+})

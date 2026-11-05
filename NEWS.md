@@ -333,6 +333,26 @@ Two things documented because they would otherwise be discovered the hard way:
   routinely, since `plotEffects()` forwards its own unresolved defaults.
   `match.arg()` rejects those outright, so the choices are resolved by hand.
 
+## Bug fixes
+
+* `esw` was `p` times the truncation width even when `left` was set, which
+  overstated it by `left / (width - left)` — about 8% at `left = 30,
+  truncation = 400`. It is now `p * (width - left)`, the strip `average.p` is
+  averaged over. The left-truncation snapshot moves accordingly; `p`, AIC and
+  the ranking do not.
+* A model `mrds` returned without converging stopped the whole sweep inside
+  `selection_table()`, because its summary has no `average.p`. It is now
+  recorded as a failure ("did not converge") and the rest of the table stands.
+  `converged` previously meant only "did not throw"; it now means converged.
+* `effect_estimates_ddf()` failed for hazard-rate and gamma keys, and recycled
+  silently for their covariate models: the shape design matrix was not
+  expanded to the evaluation grid alongside the scale one.
+* Binned data whose lowest break is above `left` (or above zero without one)
+  is refused, mirroring the existing top-bin guard. Derived breaks fall short
+  this way when the innermost bin had no detections, and a `left` inside a bin
+  dropped that bin's detections without saying so.
+* The bins-do-not-tile error named the wrong interval.
+
 ## Not yet built
 
 `g(0)` correction, the `dsm` handoff, plotting detectability against a

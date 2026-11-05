@@ -45,6 +45,10 @@ pairs leave gaps or overlap does not define a set of cutpoints, and any
 detection function over the bins. If the top bin ends before the
 truncation width, the strip between them is unaccounted effort and the
 fit describes a narrower survey than the one flown.}
+\item{Bins that start beyond \code{left}}{The same gap at the near end: the
+lowest break must equal \code{left}, or zero without it. Derived breaks fall
+short when the innermost bin had no detections, and a \code{left} inside a
+bin drops that bin's detections; supply \code{breaks} in either case.}
 }
 }
 

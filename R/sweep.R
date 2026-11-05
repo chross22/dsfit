@@ -153,6 +153,14 @@ sweep_models <- function(data, models = NULL, truncation, left = NULL,
       # shortening the list and sliding every later model onto the wrong row of
       # the selection table.
       fits[i] <- list(NULL)
+    } else if (!identical(as.numeric(fit$ds$converge), 0)) {
+      # mrds warns rather than errors when the optimiser does not converge, and
+      # returns an object whose summary has no average.p. Kept, it would be
+      # reported as converged and break the selection table, so it is recorded
+      # as a failure like any other.
+      failures <- c(failures, stats::setNames("did not converge",
+                                              models$model_id[i]))
+      fits[i] <- list(NULL)
     } else {
       fits[[i]] <- fit
     }
@@ -221,7 +229,9 @@ build_selection_table <- function(models, fits) {
   out$converged <- unname(!vapply(fits, is.null, logical(1)))
   out$n_par <- stat("n_par")
   out$aic <- aic
-  out$delta_aic <- aic - min(aic, na.rm = TRUE)
+  # With every candidate failed there is no minimum, and min() would warn and
+  # return Inf.
+  out$delta_aic <- if (all(is.na(aic))) aic else aic - min(aic, na.rm = TRUE)
   out$p <- stat("p")
   out$p_se <- stat("p_se")
   out$p_cv <- out$p_se / out$p
@@ -243,17 +253,28 @@ fit_summary <- function(f) {
 
   gof <- fit_gof(f)
 
+  # Effective strip half-width: the width of the strip that would have given
+  # the same number of detections under certain detection. This is what
+  # propagates into density, which is why it sits next to the AIC. average.p
+  # is the mean of g(x) over the strip actually searched, which with left
+  # truncation is (left, width) and not (0, width).
+  left <- if (is.null(s$left)) 0 else s$left
+  p <- scalar(s$average.p)
+
   list(
     n_par = length(f$par),
-    p = s$average.p,
-    p_se = s$average.p.se,
-    # Effective strip half-width: the width of the strip that would have given
-    # the same number of detections under certain detection. This is what
-    # propagates into density, which is why it sits next to the AIC.
-    esw = s$average.p * s$width,
+    p = p,
+    p_se = scalar(s$average.p.se),
+    esw = p * (scalar(s$width) - left),
     cvm_p = gof$cvm_p,
     chisq_p = gof$chisq_p
   )
+}
+
+# A summary field as one number, NA when mrds left it empty or absent.
+scalar <- function(x) {
+  if (length(x) != 1L) return(NA_real_)
+  as.numeric(x)
 }
 
 # Goodness of fit, in whichever forms the fit admits. For both tests the null is

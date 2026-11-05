@@ -47,8 +47,8 @@
       snap_table(sw)
     Output
         model converged n_par     aic delta_aic      p  p_cv   esw cvm_p chisq_p
-      1    hn      TRUE     1 1695.39      0.00 0.2959 0.071 118.4 0.809   0.683
-      2    hr      TRUE     2 1705.36      9.97 0.3330 0.088 133.2 0.709   0.179
+      1    hn      TRUE     1 1695.39      0.00 0.2959 0.071 109.5 0.809   0.683
+      2    hr      TRUE     2 1705.36      9.97 0.3330 0.088 123.2 0.709   0.179
 
 # what the sweep reports about itself is stable
 

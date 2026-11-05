@@ -21,6 +21,10 @@
 #'     detection function over the bins. If the top bin ends before the
 #'     truncation width, the strip between them is unaccounted effort and the
 #'     fit describes a narrower survey than the one flown.}
+#'   \item{Bins that start beyond `left`}{The same gap at the near end: the
+#'     lowest break must equal `left`, or zero without it. Derived breaks fall
+#'     short when the innermost bin had no detections, and a `left` inside a
+#'     bin drops that bin's detections; supply `breaks` in either case.}
 #' }
 #'
 #' @section What it drops, and reports:
@@ -135,6 +139,24 @@ prepare_distance_data <- function(data, truncation, left = NULL,
       ))
     }
 
+    # The same holds at the near end. mrds integrates from `left` (zero without
+    # it), so a lowest bin that begins further out leaves a strip of effort
+    # with no bin to put detections in. It arises from derived breaks when the
+    # innermost bin had no detections, and from a `left` that falls inside a
+    # bin, whose detections are then dropped.
+    bottom <- min(breaks)
+    start <- if (is.null(left)) 0 else left
+    if (!isTRUE(all.equal(bottom, start))) {
+      rlang::abort(paste0(
+        "The lowest bin begins at ", bottom, " but the fit starts at ", start,
+        if (is.null(left)) " (no `left` is set)" else " (`left`)",
+        ". A binned fit integrates over the bins, so the strip between them is ",
+        "unaccounted effort. Either set `left = ", bottom, "`, or supply ",
+        "`breaks` starting at ", start, " - an inner bin with no detections ",
+        "is still a bin, and derived breaks cannot know it was there."
+      ))
+    }
+
     return(list(data = ensure_object(data), binned = TRUE, breaks = breaks,
                 n_dropped = n0 - nrow(data), dropped = dropped))
   }
@@ -161,10 +183,11 @@ derive_breaks <- function(data) {
   if (nrow(bins) > 1) {
     gaps <- bins$b[-1] != bins$e[-nrow(bins)]
     if (any(gaps)) {
+      first_gap <- which(gaps)[1]
       rlang::abort(paste0(
-        "The bins do not tile: interval ", nrow(bins) - sum(gaps),
-        " ends at ", bins$e[which(gaps)[1]], " and the next begins at ",
-        bins$b[which(gaps)[1] + 1], ". Supply `breaks` explicitly."
+        "The bins do not tile: interval ", first_gap,
+        " ends at ", bins$e[first_gap], " and the next begins at ",
+        bins$b[first_gap + 1], ". Supply `breaks` explicitly."
       ))
     }
   }
