@@ -24,8 +24,14 @@ model_set(key = c("hn", "hr"), adjustment = NULL, order = NULL, formula = ~1)
 
 - order:
 
-  Integer vector of adjustment orders. Ignored when `adjustment` is
-  `NULL`.
+  Integer vector of highest adjustment orders, one candidate per
+  element. Orders are cumulative, as in `Distance::ds()`: each candidate
+  carries every term of its series up to `order`, so `order = 3` on `hn`
+  with `"cos"` fits `adj.order = c(2, 3)`. The series are cosine 2, 3,
+  4, ... (1, 2, 3, ... for `unif`) and Hermite or simple polynomial 4,
+  6, 8, ... (2, 4, 6, ... for `unif`). `NULL` (default) gives one term,
+  the first of the series. An order outside a key's series is dropped
+  with a warning. Ignored when `adjustment` is `NULL`.
 
 - formula:
 
@@ -53,7 +59,9 @@ A tibble with one row per candidate: `model_id`, `key`, `adjustment`,
 - `"unif"`:
 
   Uniform. Detection certain out to the truncation distance — a strip
-  transect. Only interesting with adjustment terms.
+  transect. Only interesting with adjustment terms, and takes no
+  covariates, having no scale parameter for them to act on. Both cases
+  are dropped with a warning.
 
 - `"gamma"`:
 
@@ -63,10 +71,10 @@ A tibble with one row per candidate: `model_id`, `key`, `adjustment`,
 
 ## When gamma is the right shape, and when it is a trap
 
-An aircraft cannot see the water directly beneath it. Where that is true
-the gamma key describes the survey rather than distorting it, and a
-half-normal forced through a peak at zero will misfit the near
-distances.
+An aircraft cannot see the water directly beneath it, and neither can a
+ship see past its own bow wave. Where that is true the gamma key
+describes the survey rather than distorting it, and a half-normal forced
+through a peak at zero will misfit the near distances.
 
 But a gamma key and a **left truncation model the same phenomenon**.
 Using both accounts for the blind spot twice. Pick one deliberately and
@@ -114,12 +122,12 @@ model_set()
 # With adjustments
 model_set(key = c("hn", "hr"), adjustment = "cos", order = 2:3)
 #> # A tibble: 4 × 6
-#>   model_id key   adjustment order formula dsmodel                               
-#>   <chr>    <chr> <chr>      <int> <chr>   <chr>                                 
-#> 1 hn+cos2  hn    cos            2 ~1      "~cds(key = \"hn\", formula = ~1, adj…
-#> 2 hr+cos2  hr    cos            2 ~1      "~cds(key = \"hr\", formula = ~1, adj…
-#> 3 hn+cos3  hn    cos            3 ~1      "~cds(key = \"hn\", formula = ~1, adj…
-#> 4 hr+cos3  hr    cos            3 ~1      "~cds(key = \"hr\", formula = ~1, adj…
+#>   model_id    key   adjustment order formula dsmodel                            
+#>   <chr>       <chr> <chr>      <int> <chr>   <chr>                              
+#> 1 hn+cos(2)   hn    cos            2 ~1      "~cds(key = \"hn\", formula = ~1, …
+#> 2 hr+cos(2)   hr    cos            2 ~1      "~cds(key = \"hr\", formula = ~1, …
+#> 3 hn+cos(2,3) hn    cos            3 ~1      "~cds(key = \"hn\", formula = ~1, …
+#> 4 hr+cos(2,3) hr    cos            3 ~1      "~cds(key = \"hr\", formula = ~1, …
 
 # With a detection covariate
 model_set(key = "hn", formula = list(~1, ~wt_beaufort))

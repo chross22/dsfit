@@ -259,8 +259,8 @@ the blind spot twice — <code><a href="../reference/sweep_models.html">sweep_mo
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 2 × 5</span></span></span>
 <span><span class="co">#&gt;   model_id delta_aic     p   esw    cvm_p</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> hn             0   0.244  609. 0.697   </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> hr            71.8 0.295  737. 0.000<span style="text-decoration: underline;">352</span></span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> hn             0   0.244  584. 0.697   </span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> hr            71.8 0.295  707. 0.000<span style="text-decoration: underline;">352</span></span></span></code></pre></div>
 <p>The half-normal now passes comfortably. Same survey, same animals,
 and the difference between a model set that fits and one that does not
 was a statement about the aircraft rather than about the whales.</p>
@@ -286,8 +286,8 @@ value, so <code>p̄</code> becomes a mean over the animals seen.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 2 × 5</span></span></span>
 <span><span class="co">#&gt;   model_id    delta_aic     p   p_cv   esw</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>           <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> hn beaufort       0   0.241 0.017<span style="text-decoration: underline;">9</span>  601.</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> hn               26.2 0.244 0.017<span style="text-decoration: underline;">7</span>  609.</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> hn beaufort       0   0.241 0.017<span style="text-decoration: underline;">9</span>  577.</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> hn               26.2 0.244 0.017<span style="text-decoration: underline;">7</span>  584.</span></span></code></pre></div>
 <p>Sea state was built into the simulation, so a model that knows about
 it should win here. On real data it often does not, and a covariate that
 does not earn its parameter is worth dropping.</p>

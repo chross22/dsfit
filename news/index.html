@@ -182,6 +182,20 @@
 <code>"auto"</code> is part of <code>fancyfx</code>’s argument vocabulary and arrives here routinely, since <code>plotEffects()</code> forwards its own unresolved defaults. <code><a href="https://rdrr.io/r/base/match.arg.html" class="external-link">match.arg()</a></code> rejects those outright, so the choices are resolved by hand.</li>
 </ul></div>
 <div class="section level3">
+<h3 id="bug-fixes-0-0-0-9000">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-0-0-9000"></a></h3>
+<ul><li>
+<code>esw</code> was <code>p</code> times the truncation width even when <code>left</code> was set, which overstated it by <code>left / (width - left)</code> — about 8% at <code>left = 30, truncation = 400</code>. It is now <code>p * (width - left)</code>, the strip <code>average.p</code> is averaged over. The left-truncation snapshot moves accordingly; <code>p</code>, AIC and the ranking do not.</li>
+<li>A model <code>mrds</code> returned without converging stopped the whole sweep inside <code><a href="../reference/selection_table.html">selection_table()</a></code>, because its summary has no <code>average.p</code>. It is now recorded as a failure (“did not converge”) and the rest of the table stands. <code>converged</code> previously meant only “did not throw”; it now means converged.</li>
+<li>
+<code><a href="../reference/effect_estimates_ddf.html">effect_estimates_ddf()</a></code> failed for hazard-rate and gamma keys, and recycled silently for their covariate models: the shape design matrix was not expanded to the evaluation grid alongside the scale one.</li>
+<li>Binned data whose lowest break is above <code>left</code> (or above zero without one) is refused, mirroring the existing top-bin guard. Derived breaks fall short this way when the innermost bin had no detections, and a <code>left</code> inside a bin dropped that bin’s detections without saying so.</li>
+<li>The bins-do-not-tile error named the wrong interval.</li>
+<li>Distances <code>distsamp</code> derives from a break-off to circle are now checked. <code>distance_source == "break_off"</code> is a slant distance from where the aircraft left the line and is refused; <code>"circling"</code> is perpendicular but fixed minutes after the detection, and is admitted with a warning that counts it. <code><a href="../reference/diagnose_sweep.html">diagnose_sweep()</a></code> reports either. <code>distance_source</code> is no longer offered as a covariate by <code><a href="../reference/detection_structure.html">detection_structure()</a></code>.</li>
+<li>Adjustment orders are cumulative, as in <code>Distance::ds()</code>. <code>order</code> is the highest order of each candidate, which carries every term of its series up to it: <code>model_set("hn", adjustment = "cos", order = 3)</code> fits <code>adj.order = c(2, 3)</code>, where it previously fitted the order-3 term alone. The series follow <code>Distance</code>: cosine from 2 (from 1 for <code>unif</code>), Hermite and polynomial from 4 in steps of 2 (from 2 for <code>unif</code>). Orders outside a key’s series are dropped with a warning instead of failing inside <code>mrds</code>. Model IDs name the orders: <code>hn+cos(2,3)</code>. The adjustment snapshot changes accordingly; single-term candidates reproduce their previous AICs.</li>
+<li>
+<code><a href="../reference/model_set.html">model_set()</a></code> drops a uniform key with a covariate formula, with a warning. The uniform key has no scale for a covariate to act on, and <code>mrds</code> ignored the formula, so <code>unif+cos1 bf</code> fitted identically to <code>unif+cos1</code> and the table carried a duplicate under a covariate label.</li>
+</ul></div>
+<div class="section level3">
 <h3 id="not-yet-built-0-0-0-9000">Not yet built<a class="anchor" aria-label="anchor" href="#not-yet-built-0-0-0-9000"></a></h3>
 <p><code>g(0)</code> correction, the <code>dsm</code> handoff, plotting detectability against a covariate (a different quantity from g(x), and not the same plot), and a vignette.</p>
 </div>

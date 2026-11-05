@@ -65,6 +65,27 @@ away half the survey.
   unaccounted effort and the fit describes a narrower survey than the
   one flown.
 
+- Bins that start beyond `left`:
+
+  The same gap at the near end: the lowest break must equal `left`, or
+  zero without it. Derived breaks fall short when the innermost bin had
+  no detections, and a `left` inside a bin drops that bin's detections;
+  supply `breaks` in either case.
+
+- Break-off distances:
+
+  `distance_source == "break_off"`, which `distsamp` gives a circling
+  sighting with no exact position: a slant distance from where the
+  aircraft left the line, not a perpendicular one.
+
+## What it warns about
+
+`distance_source == "circling"`: a circling sighting's exact position
+projected onto the census line. The right quantity, but fixed minutes
+after the detection, and excluded by `distsamp::detection_data()` unless
+`include_circling = TRUE`. Admitted, with the count, so the choice is
+made knowingly.
+
 ## What it drops, and reports
 
 Rows with no distance at all — which is how a flatfile records a sample

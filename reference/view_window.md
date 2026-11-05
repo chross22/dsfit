@@ -76,7 +76,9 @@ perpendicular distance.
 
 [`view_window_aerial()`](https://camilleross.org/dsfit/reference/view_window_aerial.md)
 for an aircraft's forward-and-aft field of view, which is the usual case
-here.
+here, and
+[`view_window_vessel()`](https://camilleross.org/dsfit/reference/view_window_vessel.md)
+for a ship's forward search arc.
 [`availability()`](https://camilleross.org/dsfit/reference/availability.md)
 for what the window feeds.
 

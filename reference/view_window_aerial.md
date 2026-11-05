@@ -82,6 +82,7 @@ local abundance. *Endangered Species Research* 38:101-113.
 
 [`availability()`](https://camilleross.org/dsfit/reference/availability.md),
 [`view_window()`](https://camilleross.org/dsfit/reference/view_window.md),
+[`view_window_vessel()`](https://camilleross.org/dsfit/reference/view_window_vessel.md),
 [ganley_availability](https://camilleross.org/dsfit/reference/ganley_availability.md)
 
 ## Examples

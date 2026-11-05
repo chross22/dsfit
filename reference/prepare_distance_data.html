@@ -114,8 +114,30 @@ detection function over the bins. If the top bin ends before the
 truncation width, the strip between them is unaccounted effort and the
 fit describes a narrower survey than the one flown.</p></dd>
 
+<dt>Bins that start beyond <code>left</code></dt>
+<dd><p>The same gap at the near end: the
+lowest break must equal <code>left</code>, or zero without it. Derived breaks fall
+short when the innermost bin had no detections, and a <code>left</code> inside a
+bin drops that bin's detections; supply <code>breaks</code> in either case.</p></dd>
+
+<dt>Break-off distances</dt>
+<dd><p><code>distance_source == "break_off"</code>, which
+<code>distsamp</code> gives a circling sighting with no exact position: a slant
+distance from where the aircraft left the line, not a perpendicular
+one.</p></dd>
+
 
 </dl></div>
+    <div class="section level2">
+    <h2 id="what-it-warns-about">What it warns about<a class="anchor" aria-label="anchor" href="#what-it-warns-about"></a></h2>
+
+
+<p><code>distance_source == "circling"</code>: a circling sighting's exact position
+projected onto the census line. The right quantity, but fixed minutes after
+the detection, and excluded by <code>distsamp::detection_data()</code> unless
+<code>include_circling = TRUE</code>. Admitted, with the count, so the choice is made
+knowingly.</p>
+    </div>
     <div class="section level2">
     <h2 id="what-it-drops-and-reports">What it drops, and reports<a class="anchor" aria-label="anchor" href="#what-it-drops-and-reports"></a></h2>
 

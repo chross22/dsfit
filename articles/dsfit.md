@@ -199,8 +199,8 @@ selection_table(sw_left)[, c("model_id", "delta_aic", "p", "esw", "cvm_p")]
 #> # A tibble: 2 × 5
 #>   model_id delta_aic     p   esw    cvm_p
 #>   <chr>        <dbl> <dbl> <dbl>    <dbl>
-#> 1 hn             0   0.244  609. 0.697   
-#> 2 hr            71.8 0.295  737. 0.000352
+#> 1 hn             0   0.244  584. 0.697   
+#> 2 hr            71.8 0.295  707. 0.000352
 ```
 
 The half-normal now passes comfortably. Same survey, same animals, and
@@ -231,8 +231,8 @@ selection_table(sw_cov)[, c("model_id", "delta_aic", "p", "p_cv", "esw")]
 #> # A tibble: 2 × 5
 #>   model_id    delta_aic     p   p_cv   esw
 #>   <chr>           <dbl> <dbl>  <dbl> <dbl>
-#> 1 hn beaufort       0   0.241 0.0179  601.
-#> 2 hn               26.2 0.244 0.0177  609.
+#> 1 hn beaufort       0   0.241 0.0179  577.
+#> 2 hn               26.2 0.244 0.0177  584.
 ```
 
 Sea state was built into the simulation, so a model that knows about it

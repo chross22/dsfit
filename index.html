@@ -71,98 +71,151 @@
 </h1></div>
 <!-- badges: start -->
 
-<p>Fits and compares detection functions for line-transect distance sampling.</p>
-<p>Takes the flatfile produced by <a href="https://github.com/chross22/distsamp" class="external-link"><code>distsamp</code></a> (or any equivalent table), fits a set of candidate detection functions through <code>mrds</code>, and returns a selection table carrying effective strip half-width and its CV alongside each AIC.</p>
-<blockquote>
-<p><strong>Status: complete in scope.</strong> The model set, the sweep, the input guards, snapshot regression tests pinning the selection, the <code>g(0)</code> correction slot and a vignette are built and tested. Density surface models live in their own package. See <a href="docs/01-plan.html">docs/01-plan.md</a>.</p>
-</blockquote>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/vignette.html" class="external-link">vignette</a></span><span class="op">(</span><span class="st">"dsfit"</span><span class="op">)</span></span></code></pre></div>
+<p>Fits and compares line-transect detection functions through <code>mrds</code>.</p>
+<p>Input: one row per detection, with <code>distance</code> (exact) or <code>distbegin</code> and <code>distend</code> (binned). The flatfile from <a href="https://github.com/chross22/distsamp" class="external-link">distsamp</a> has this shape.</p>
 <div class="section level2">
 <h2 id="install">Install<a class="anchor" aria-label="anchor" href="#install"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># install.packages("remotes")</span></span>
-<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"chross22/dsfit"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"chross22/dsfit"</span><span class="op">)</span></span></code></pre></div>
+<p>Plotting uses <a href="https://github.com/chross22/fancyfx" class="external-link">fancyfx</a>, optional.</p>
 </div>
 <div class="section level2">
-<h2 id="use">Use<a class="anchor" aria-label="anchor" href="#use"></a>
+<h2 id="example-data">Example data<a class="anchor" aria-label="anchor" href="#example-data"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/chross22/dsfit" class="external-link">dsfit</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">sw</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sweep_models.html">sweep_models</a></span><span class="op">(</span></span>
-<span>  <span class="va">detections</span>,                              <span class="co"># needs `distance`, or distbegin/distend</span></span>
-<span>  <span class="fu"><a href="reference/model_set.html">model_set</a></span><span class="op">(</span>key <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hn"</span>, <span class="st">"hr"</span>, <span class="st">"gamma"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  truncation <span class="op">=</span> <span class="fl">400</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span>
+<span><span class="va">n</span> <span class="op">&lt;-</span> <span class="fl">300</span></span>
+<span><span class="va">detections</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  object   <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="va">n</span>,</span>
+<span>  beaufort <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fl">0</span><span class="op">:</span><span class="fl">4</span>, <span class="va">n</span>, replace <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
+<span>  glare    <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"none"</span>, <span class="st">"some"</span><span class="op">)</span>, <span class="va">n</span>, replace <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
+<span>  size     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Poisson.html" class="external-link">rpois</a></span><span class="op">(</span><span class="va">n</span>, <span class="fl">1</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span></span>
 <span><span class="op">)</span></span>
+<span><span class="va">detections</span><span class="op">$</span><span class="va">distance</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span>, <span class="fl">0</span>, <span class="fl">150</span> <span class="op">-</span> <span class="fl">15</span> <span class="op">*</span> <span class="va">detections</span><span class="op">$</span><span class="va">beaufort</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>Synthetic.</p>
+</div>
+<div class="section level2">
+<h2 id="check">Check<a class="anchor" aria-label="anchor" href="#check"></a>
+</h2>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/detection_structure.html">detection_structure</a></span><span class="op">(</span><span class="va">detections</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/diagnose_sweep.html">diagnose_sweep</a></span><span class="op">(</span><span class="va">detections</span>, <span class="fu"><a href="reference/model_set.html">model_set</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hn"</span>, <span class="st">"hr"</span><span class="op">)</span><span class="op">)</span>, truncation <span class="op">=</span> <span class="fl">400</span><span class="op">)</span></span></code></pre></div>
+<p>Nothing is fitted.</p>
+</div>
+<div class="section level2">
+<h2 id="fit">Fit<a class="anchor" aria-label="anchor" href="#fit"></a>
+</h2>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">sw</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sweep_models.html">sweep_models</a></span><span class="op">(</span><span class="va">detections</span>, <span class="fu"><a href="reference/model_set.html">model_set</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hn"</span>, <span class="st">"hr"</span>, <span class="st">"gamma"</span><span class="op">)</span><span class="op">)</span>, truncation <span class="op">=</span> <span class="fl">400</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">sw</span></span>
-<span><span class="co">#&gt; &lt;dsfit_sweep&gt;</span></span>
-<span><span class="co">#&gt;   detections:  200</span></span>
-<span><span class="co">#&gt;   truncation:  400</span></span>
-<span><span class="co">#&gt;   models:      3 of 3 fitted</span></span>
-<span><span class="co">#&gt;</span></span>
-<span><span class="co">#&gt;  model  dAIC      p  p_cv   esw CvM_p</span></span>
-<span><span class="co">#&gt;     hn  0.00 0.3494 0.052 139.8 0.928</span></span>
-<span><span class="co">#&gt;  gamma  9.92 0.3010 0.074 120.4 0.498</span></span>
-<span><span class="co">#&gt;     hr 10.18 0.3781 0.064 151.3 0.786</span></span></code></pre></div>
-<p>Read that table across, not down. <code>hn</code> wins on AIC, but <code>esw</code> spans 120 to 151 across the three — a 26% spread in the strip width that abundance is divided by.</p>
+<span><span class="fu"><a href="reference/selection_table.html">selection_table</a></span><span class="op">(</span><span class="va">sw</span><span class="op">)</span></span>
+<span><span class="va">sw</span><span class="op">$</span><span class="va">fits</span><span class="op">[[</span><span class="st">"hn"</span><span class="op">]</span><span class="op">]</span>     <span class="co"># the mrds fit</span></span></code></pre></div>
+<p><code>truncation</code> is required. <code>left =</code> sets left truncation.</p>
 </div>
 <div class="section level2">
-<h2 id="three-things-it-insists-on">Three things it insists on<a class="anchor" aria-label="anchor" href="#three-things-it-insists-on"></a>
+<h2 id="model-sets">Model sets<a class="anchor" aria-label="anchor" href="#model-sets"></a>
 </h2>
-<p><strong>Truncation is one value per sweep.</strong> AIC compares models fitted to the same data, and changing the truncation changes which detections are in the likelihood. So it is an argument, not a column. To compare truncations, compare <em>sweeps</em>, and look at whether the chosen model and its <code>p̄</code> are stable.</p>
-<p><strong>Binned and exact distances cannot be ranked together.</strong> <code>STRIP</code>-derived distances are intervals; angle- and position-derived distances are points. The likelihoods differ, so a table containing both is a survey-era boundary rather than a model set. Refused, with the reason.</p>
-<p><strong>Effective strip half-width sits next to the AIC.</strong> It is what propagates into density. Two models within 2 AIC of one another can imply materially different abundance, and nothing in an AIC column shows that.</p>
-</div>
-<div class="section level2">
-<h2 id="goodness-of-fit">Goodness of fit<a class="anchor" aria-label="anchor" href="#goodness-of-fit"></a>
-</h2>
-<p>A model can top the AIC ranking and still fail a goodness-of-fit test. Test used is determined by the data: Cramér-von Mises (<code>cvm_p</code>) for exact distances, and a chi-square over the survey’s own bins (<code>chisq_p</code>) for binned ones, which have no empirical distribution for CvM to test. <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> shows whichever applies.</p>
-<p>Both columns are named for their test, because a p-value read without knowing what produced it is worse than no p-value. <code>chisq_p</code> is filled in for exact fits too, but over cutpoints <code>mrds</code> chooses rather than bins anyone surveyed — read <code>cvm_p</code> there.</p>
-</div>
-<div class="section level2">
-<h2 id="snapshot-tests">Snapshot tests<a class="anchor" aria-label="anchor" href="#snapshot-tests"></a>
-</h2>
-<p>The sweep <em>selects</em> a model. The snapshots in <code>tests/testthat/test-selection-snapshot.R</code> pin the selection — the whole table, not just the winner — so that an <code>mrds</code> upgrade cannot quietly change which model wins or by how much. A swap between models three and four is the same change arriving early enough to look at.</p>
-<p>This is the requirement that made the middle layer a package. Writing them turned up a live bug in which a candidate that failed to fit shifted every model below it onto the wrong row, producing a wrong selection table rather than an error.</p>
-</div>
-<div class="section level2">
-<h2 id="the-gamma-key">The gamma key<a class="anchor" aria-label="anchor" href="#the-gamma-key"></a>
-</h2>
-<p><code>Distance::ds()</code> offers <code>hn</code>, <code>hr</code>, and <code>unif</code>. The gamma key — <strong>unimodal, with its peak away from zero</strong> — is available in <code>mrds</code> alone, which is one reason this package fits through <code>mrds</code> directly rather than wrapping <code>ds()</code>.</p>
-<p>It is the natural shape for an aerial platform that cannot see the water directly beneath it. But a gamma key and a <strong>left truncation model the same phenomenon</strong>, so applying both accounts for the blind spot twice. <code><a href="reference/sweep_models.html">sweep_models()</a></code> warns when you do.</p>
-</div>
-<div class="section level2">
-<h2 id="plotting">Plotting<a class="anchor" aria-label="anchor" href="#plotting"></a>
-</h2>
-<p><code><a href="reference/effect_estimates_ddf.html">effect_estimates.ddf()</a></code> makes a fitted detection function plottable with <a href="https://github.com/chross22/fancyfx" class="external-link">fancyfx</a>:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">fancyfx</span><span class="fu">::</span><span class="fu"><a href="https://camilleross.org/fancyfx/reference/plotEffects.html" class="external-link">plotEffects</a></span><span class="op">(</span><span class="va">sw</span><span class="op">$</span><span class="va">fits</span><span class="op">[[</span><span class="st">"hn"</span><span class="op">]</span><span class="op">]</span>, dat <span class="op">=</span> <span class="va">detections</span>, var <span class="op">=</span> <span class="st">"distance"</span><span class="op">)</span></span></code></pre></div>
-<p>which gives the fitted g(x) with a delta-method ribbon and a rug of the observed distances above it — the standard detection-function diagnostic, and fancyfx’s premise applied almost exactly. <code>fancyfx</code> is a <code>Suggests</code>, so it is optional.</p>
-<p>One thing worth knowing: for a <strong>covariate</strong> model the area under that curve is not the <code>esw</code> in the selection table. <code>mrds</code> computes <code>average.p</code> as a Horvitz-Thompson mean, weighting each animal by the inverse of its own detection probability; the plotted curve is the plain mean over the animals as observed. They coincide only when detection probability is constant.</p>
-</div>
-<div class="section level2">
-<h2 id="availability">Availability<a class="anchor" aria-label="anchor" href="#availability"></a>
-</h2>
-<p><code>g(0)</code> has three components: the <strong>geometric blind spot</strong> under the aircraft, <strong>availability</strong> (whether the animal was at the surface to be seen), and <strong>perception</strong> (whether an observer who could have seen it did). Correcting for one while believing you have corrected for another is how these estimates go wrong by a factor rather than a percentage.</p>
-<p>dsfit computes only availability. <code><a href="reference/availability.html">availability()</a></code> implements the Laake et al. (1997) equation from external dive data — surface and dive times, and the time an animal spends in view:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">a</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/availability.html">availability</a></span><span class="op">(</span>surface <span class="op">=</span> <span class="fl">2.4</span>, dive <span class="op">=</span> <span class="fl">8.1</span>, t_w <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></code></pre></div>
-<p>It <strong>computes; it does not estimate.</strong> There is no likelihood and no data being fitted — given dive parameters, the answer follows arithmetically, so its uncertainty is inherited from the dive study rather than from your survey. <code>ganley_surface_time()</code> carries the measured monthly surface times from Ganley et al. (2019), which vary enough month to month to rule out a constant.</p>
-<p><code><a href="reference/g0.html">g0()</a></code> assembles a full correction from components, keeps their sources named separately, and propagates the standard error.</p>
-<p>→ <a href="vignettes/availability.Rmd"><strong>Availability and the g(0) correction</strong></a> is the reference: the equation and the window it depends on, why availability is a function of the window rather than a number, the output shape and its standard error, which of the three built-in datasets are real, what a sweep needs before you run one, what your data can and cannot support, and how to record where each component came from.</p>
+<code class="sourceCode R"><span><span class="fu"><a href="reference/model_set.html">model_set</a></span><span class="op">(</span>key <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hn"</span>, <span class="st">"hr"</span>, <span class="st">"gamma"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/model_set.html">model_set</a></span><span class="op">(</span>key <span class="op">=</span> <span class="st">"hn"</span>, adjustment <span class="op">=</span> <span class="st">"cos"</span>, order <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>   <span class="co"># cos orders 2 and 3</span></span>
+<span><span class="fu"><a href="reference/model_set.html">model_set</a></span><span class="op">(</span>key <span class="op">=</span> <span class="st">"hn"</span>, formula <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">~</span><span class="fl">1</span>, <span class="op">~</span><span class="va">beaufort</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="distance-sampling-to-modeling-pipeline">Distance sampling to modeling pipeline<a class="anchor" aria-label="anchor" href="#distance-sampling-to-modeling-pipeline"></a>
+<h2 id="all-covariate-combinations">All covariate combinations<a class="anchor" aria-label="anchor" href="#all-covariate-combinations"></a>
 </h2>
-<pre><code>distsamp   NARWC survey data  -&gt;  effort segments + detection distances
-   |
-dsfit      detection functions: model set, sweep, selection table
-   |
-analysis   which years, which truncation, which covariates, the report</code></pre>
-<p>The middle layer is a package because its logic needs tests. The outer layer is not, because its choices change every run.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">covs</span>   <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"beaufort"</span>, <span class="st">"glare"</span>, <span class="st">"size"</span><span class="op">)</span></span>
+<span><span class="va">combos</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_along</a></span><span class="op">(</span><span class="va">covs</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">k</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/combn.html" class="external-link">combn</a></span><span class="op">(</span><span class="va">covs</span>, <span class="va">k</span>, simplify <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>                 recursive <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">forms</span>  <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">~</span><span class="fl">1</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">combos</span>, <span class="va">reformulate</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">sw_cov</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sweep_models.html">sweep_models</a></span><span class="op">(</span><span class="va">detections</span>, <span class="fu"><a href="reference/model_set.html">model_set</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hn"</span>, <span class="st">"hr"</span><span class="op">)</span>, formula <span class="op">=</span> <span class="va">forms</span><span class="op">)</span>,</span>
+<span>                       truncation <span class="op">=</span> <span class="fl">400</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/selection_table.html">selection_table</a></span><span class="op">(</span><span class="va">sw_cov</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="plot">Plot<a class="anchor" aria-label="anchor" href="#plot"></a>
+</h2>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="va">sw</span><span class="op">$</span><span class="va">fits</span><span class="op">[[</span><span class="st">"hn"</span><span class="op">]</span><span class="op">]</span></span>
+<span></span>
+<span><span class="fu">fancyfx</span><span class="fu">::</span><span class="fu"><a href="https://camilleross.org/fancyfx/reference/plotEffects.html" class="external-link">plotEffects</a></span><span class="op">(</span><span class="va">fit</span>, dat <span class="op">=</span> <span class="va">detections</span>, var <span class="op">=</span> <span class="st">"distance"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">est</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/effect_estimates_ddf.html">effect_estimates_ddf</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>    <span class="co"># .x, .estimate, .lower, .upper</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">est</span><span class="op">$</span><span class="va">.x</span>, <span class="va">est</span><span class="op">$</span><span class="va">.estimate</span>, type <span class="op">=</span> <span class="st">"l"</span>, ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="reference/effect_estimates_ddf.html">effect_estimates_ddf</a></span><span class="op">(</span><span class="va">sw_cov</span><span class="op">$</span><span class="va">fits</span><span class="op">[[</span><span class="st">"hn beaufort"</span><span class="op">]</span><span class="op">]</span>, at <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>beaufort <span class="op">=</span> <span class="fl">4</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="binned-distances">Binned distances<a class="anchor" aria-label="anchor" href="#binned-distances"></a>
+</h2>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">binned</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/transform.html" class="external-link">transform</a></span><span class="op">(</span><span class="va">detections</span>, distbegin <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">floor</a></span><span class="op">(</span><span class="va">distance</span> <span class="op">/</span> <span class="fl">100</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span><span class="op">)</span></span>
+<span><span class="va">binned</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/transform.html" class="external-link">transform</a></span><span class="op">(</span><span class="va">binned</span>, distend <span class="op">=</span> <span class="va">distbegin</span> <span class="op">+</span> <span class="fl">100</span>, distance <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="reference/sweep_models.html">sweep_models</a></span><span class="op">(</span><span class="va">binned</span><span class="op">[</span><span class="va">binned</span><span class="op">$</span><span class="va">distend</span> <span class="op">&lt;=</span> <span class="fl">400</span>, <span class="op">]</span>, <span class="fu"><a href="reference/model_set.html">model_set</a></span><span class="op">(</span><span class="st">"hn"</span><span class="op">)</span>, truncation <span class="op">=</span> <span class="fl">400</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="availability-and-g0">Availability and g(0)<a class="anchor" aria-label="anchor" href="#availability-and-g0"></a>
+</h2>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">avail</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/availability.html">availability</a></span><span class="op">(</span>surface <span class="op">=</span> <span class="fl">60</span>, dive <span class="op">=</span> <span class="fl">240</span>, window <span class="op">=</span> <span class="fl">24</span>,</span>
+<span>                      se_surface <span class="op">=</span> <span class="fl">8</span>, se_dive <span class="op">=</span> <span class="fl">25</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">perception</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>key <span class="op">=</span> <span class="cn">NA</span>, component <span class="op">=</span> <span class="st">"perception"</span>, value <span class="op">=</span> <span class="fl">0.68</span>,</span>
+<span>                         se <span class="op">=</span> <span class="fl">0.09</span>, source <span class="op">=</span> <span class="st">"borrowed"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/g0.html">g0</a></span><span class="op">(</span><span class="va">avail</span>, <span class="va">perception</span><span class="op">)</span></span></code></pre></div>
+<p>Not applied to the fit. Divide abundance by it.</p>
+</div>
+<div class="section level2">
+<h2 id="selection-table">Selection table<a class="anchor" aria-label="anchor" href="#selection-table"></a>
+</h2>
+<table class="table">
+<thead><tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>delta_aic</code></td>
+<td>AIC difference from the lowest</td>
+</tr>
+<tr>
+<td>
+<code>p</code>, <code>p_cv</code>
+</td>
+<td>Average detection probability and its CV</td>
+</tr>
+<tr>
+<td><code>esw</code></td>
+<td>Effective strip half-width, <code>p * (truncation - left)</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>cvm_p</code> / <code>chisq_p</code>
+</td>
+<td>Goodness of fit, exact / binned</td>
+</tr>
+<tr>
+<td><code>converged</code></td>
+<td>
+<code>FALSE</code> for a failed fit</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level2">
+<h2 id="other-functions">Other functions<a class="anchor" aria-label="anchor" href="#other-functions"></a>
+</h2>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/view_window_aerial.html">view_window_aerial</a></span><span class="op">(</span>trackline <span class="op">=</span> <span class="fl">51.22</span>, speed <span class="op">=</span> <span class="fl">51.4</span>, slope <span class="op">=</span> <span class="fl">0.03</span><span class="op">)</span>   <span class="co"># time in view</span></span>
+<span><span class="fu"><a href="reference/view_window_vessel.html">view_window_vessel</a></span><span class="op">(</span>radius <span class="op">=</span> <span class="fl">6000</span>, speed <span class="op">=</span> <span class="fl">5.1</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/prepare_distance_data.html">prepare_distance_data</a></span><span class="op">(</span><span class="va">detections</span>, truncation <span class="op">=</span> <span class="fl">400</span><span class="op">)</span>                 <span class="co"># the input guards</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
@@ -172,49 +225,32 @@ analysis   which years, which truncation, which covariates, the report</code></p
 <col width="50%">
 <col width="50%">
 </colgroup>
+<thead><tr>
+<th>Topic</th>
+<th>File</th>
+</tr></thead>
 <tbody>
 <tr>
-<td><a href="vignettes/dsfit.Rmd">Getting started</a></td>
-<td>a survey to work with, the model set, the sweep, and how to read the table</td>
+<td>Code guide</td>
+<td>
+<a href="docs/02-code-guide.html">docs/02-code-guide.md</a> (<a href="docs/02-code-guide.pdf">PDF</a>)</td>
 </tr>
 <tr>
-<td><a href="vignettes/availability.Rmd">Availability and the g(0) correction</a></td>
-<td>the one component dsfit computes, and how to assemble the rest</td>
+<td>Design and guards</td>
+<td><a href="docs/01-plan.html">docs/01-plan.md</a></td>
 </tr>
 </tbody>
 </table>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/vignette.html" class="external-link">vignette</a></span><span class="op">(</span><span class="st">"dsfit"</span>, package <span class="op">=</span> <span class="st">"dsfit"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/vignette.html" class="external-link">vignette</a></span><span class="op">(</span><span class="st">"availability"</span>, package <span class="op">=</span> <span class="st">"dsfit"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="citing-dsfit">Citing dsfit<a class="anchor" aria-label="anchor" href="#citing-dsfit"></a>
 </h2>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/citation.html" class="external-link">citation</a></span><span class="op">(</span><span class="st">"dsfit"</span><span class="op">)</span></span></code></pre></div>
-<p>That returns up to three entries — the package, the <code>mrds</code> toolchain every fit comes off, and the gamma key function if you selected a gamma model:</p>
-<pre><code>Ross, C. dsfit: Fit and Compare Detection Functions for Line-Transect Survey
-Data. R package. https://github.com/chross22/dsfit
-
-Miller, D.L., Rexstad, E., Thomas, L., Marshall, L. and Laake, J.L. (2019)
-Distance sampling in R. Journal of Statistical Software 89(1):1-28.
-doi:10.18637/jss.v089.i01
-
-Becker, E.A. and Quang, P.X. (2009) A gamma-shaped detection function for
-line-transect surveys with mark-recapture and covariate data. Journal of
-Agricultural, Biological and Environmental Statistics 14:207-223.
-doi:10.1198/jabes.2009.0013</code></pre>
-<p>The package version comes from <code>DESCRIPTION</code> at install time, so it is always the version you actually have. Record the truncation and the model set as well: a selection table is not reproducible without them.</p>
-</div>
-<div class="section level2">
-<h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
-</h2>
-<p>What each source is relied on for is in <a href="tools/citations.csv">tools/citations.csv</a>. They are checked monthly by CI — DOIs still resolve and still describe the paper cited.</p>
-<p>Becker, E.A. and Quang, P.X. (2009) A gamma-shaped detection function for line-transect surveys with mark-recapture and covariate data. <em>Journal of Agricultural, Biological and Environmental Statistics</em> 14:207–223. <a href="https://doi.org/10.1198/jabes.2009.0013" class="external-link uri">https://doi.org/10.1198/jabes.2009.0013</a> — <em>the gamma key, and the aerial-survey case it was developed for.</em></p>
-<p>Buckland, S.T., Anderson, D.R., Burnham, K.P., Laake, J.L., Borchers, D.L. and Thomas, L. (2001) <em>Introduction to Distance Sampling: Estimating Abundance of Biological Populations.</em> Oxford University Press. — <em>the standard line-transect reference.</em></p>
-<p>Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there is: estimating North Atlantic right whale <em>Eubalaena glacialis</em> local abundance. <em>Endangered Species Research</em> 38:101–113. <a href="https://doi.org/10.3354/esr00938" class="external-link uri">https://doi.org/10.3354/esr00938</a> — <em>availability from focal follows, the monthly variation that rules out a constant, and the measured time in view behind <code>ganley_surface_time</code>.</em></p>
-<p>Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997) Probability of detecting harbor porpoise from aerial surveys: estimating g(0). <em>The Journal of Wildlife Management</em> 61:63–75. <a href="https://doi.org/10.2307/3802415" class="external-link uri">https://doi.org/10.2307/3802415</a> — <em>the availability equation itself.</em></p>
-<p>Laake, J.L. and Borchers, D.L. (2004) Methods for incomplete detection at distance zero. In <em>Advanced Distance Sampling</em>, pp. 108–189. Oxford University Press. — <em>why <code>g(0)</code> is not estimable from single-observer data.</em></p>
-<p>Marques, F.F.C. and Buckland, S.T. (2004) Covariate models for the detection function. In <em>Advanced Distance Sampling</em>, pp. 31–47. Oxford University Press. — <em>covariate detection functions, which is what <code>mcds</code> fits.</em></p>
-<p>Miller, D.L., Rexstad, E., Thomas, L., Marshall, L. and Laake, J.L. (2019) Distance sampling in R. <em>Journal of Statistical Software</em> 89(1):1–28. <a href="https://doi.org/10.18637/jss.v089.i01" class="external-link uri">https://doi.org/10.18637/jss.v089.i01</a> — <em>the <code>Distance</code> and <code>mrds</code> toolchain this package fits through.</em></p>
-<p>Roberts, J.J., Yack, T.M., Fujioka, E., Halpin, P.N., Baumgartner, M.F. and others (2024) North Atlantic right whale density surface model for the US Atlantic evaluated with passive acoustic monitoring. <em>Marine Ecology Progress Series</em> 732:167–192. <a href="https://doi.org/10.3354/meps14547" class="external-link uri">https://doi.org/10.3354/meps14547</a> — <em>corrections applied per platform, team and conditions, at continental scale.</em></p>
+<p>Returns the package, <code>mrds</code> (Miller et al. 2019) and the gamma key (Becker and Quang 2009). Report the truncation and the model set.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">

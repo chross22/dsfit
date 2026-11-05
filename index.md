@@ -1,197 +1,154 @@
 # dsfit
 
-Fits and compares detection functions for line-transect distance
-sampling.
+Fits and compares line-transect detection functions through `mrds`.
 
-Takes the flatfile produced by
-[`distsamp`](https://github.com/chross22/distsamp) (or any equivalent
-table), fits a set of candidate detection functions through `mrds`, and
-returns a selection table carrying effective strip half-width and its CV
-alongside each AIC.
-
-> **Status: complete in scope.** The model set, the sweep, the input
-> guards, snapshot regression tests pinning the selection, the `g(0)`
-> correction slot and a vignette are built and tested. Density surface
-> models live in their own package. See
-> [docs/01-plan.md](https://camilleross.org/dsfit/docs/01-plan.md).
-
-``` r
-
-vignette("dsfit")
-```
+Input: one row per detection, with `distance` (exact) or `distbegin` and
+`distend` (binned). The flatfile from
+[distsamp](https://github.com/chross22/distsamp) has this shape.
 
 ## Install
 
 ``` r
 
-# install.packages("remotes")
 remotes::install_github("chross22/dsfit")
 ```
 
-## Use
+Plotting uses [fancyfx](https://github.com/chross22/fancyfx), optional.
+
+## Example data
 
 ``` r
 
 library(dsfit)
 
-sw <- sweep_models(
-  detections,                              # needs `distance`, or distbegin/distend
-  model_set(key = c("hn", "hr", "gamma")),
-  truncation = 400
+set.seed(1)
+n <- 300
+detections <- data.frame(
+  object   = 1:n,
+  beaufort = sample(0:4, n, replace = TRUE),
+  glare    = sample(c("none", "some"), n, replace = TRUE),
+  size     = rpois(n, 1) + 1
 )
+detections$distance <- abs(rnorm(n, 0, 150 - 15 * detections$beaufort))
+```
+
+Synthetic.
+
+## Check
+
+``` r
+
+detection_structure(detections)
+diagnose_sweep(detections, model_set(c("hn", "hr")), truncation = 400)
+```
+
+Nothing is fitted.
+
+## Fit
+
+``` r
+
+sw <- sweep_models(detections, model_set(c("hn", "hr", "gamma")), truncation = 400)
 
 sw
-#> <dsfit_sweep>
-#>   detections:  200
-#>   truncation:  400
-#>   models:      3 of 3 fitted
-#>
-#>  model  dAIC      p  p_cv   esw CvM_p
-#>     hn  0.00 0.3494 0.052 139.8 0.928
-#>  gamma  9.92 0.3010 0.074 120.4 0.498
-#>     hr 10.18 0.3781 0.064 151.3 0.786
+selection_table(sw)
+sw$fits[["hn"]]     # the mrds fit
 ```
 
-Read that table across, not down. `hn` wins on AIC, but `esw` spans 120
-to 151 across the three — a 26% spread in the strip width that abundance
-is divided by.
+`truncation` is required. `left =` sets left truncation.
 
-## Three things it insists on
-
-**Truncation is one value per sweep.** AIC compares models fitted to the
-same data, and changing the truncation changes which detections are in
-the likelihood. So it is an argument, not a column. To compare
-truncations, compare *sweeps*, and look at whether the chosen model and
-its `p̄` are stable.
-
-**Binned and exact distances cannot be ranked together.**
-`STRIP`-derived distances are intervals; angle- and position-derived
-distances are points. The likelihoods differ, so a table containing both
-is a survey-era boundary rather than a model set. Refused, with the
-reason.
-
-**Effective strip half-width sits next to the AIC.** It is what
-propagates into density. Two models within 2 AIC of one another can
-imply materially different abundance, and nothing in an AIC column shows
-that.
-
-## Goodness of fit
-
-A model can top the AIC ranking and still fail a goodness-of-fit test.
-Test used is determined by the data: Cramér-von Mises (`cvm_p`) for
-exact distances, and a chi-square over the survey’s own bins (`chisq_p`)
-for binned ones, which have no empirical distribution for CvM to test.
-[`print()`](https://rdrr.io/r/base/print.html) shows whichever applies.
-
-Both columns are named for their test, because a p-value read without
-knowing what produced it is worse than no p-value. `chisq_p` is filled
-in for exact fits too, but over cutpoints `mrds` chooses rather than
-bins anyone surveyed — read `cvm_p` there.
-
-## Snapshot tests
-
-The sweep *selects* a model. The snapshots in
-`tests/testthat/test-selection-snapshot.R` pin the selection — the whole
-table, not just the winner — so that an `mrds` upgrade cannot quietly
-change which model wins or by how much. A swap between models three and
-four is the same change arriving early enough to look at.
-
-This is the requirement that made the middle layer a package. Writing
-them turned up a live bug in which a candidate that failed to fit
-shifted every model below it onto the wrong row, producing a wrong
-selection table rather than an error.
-
-## The gamma key
-
-`Distance::ds()` offers `hn`, `hr`, and `unif`. The gamma key —
-**unimodal, with its peak away from zero** — is available in `mrds`
-alone, which is one reason this package fits through `mrds` directly
-rather than wrapping `ds()`.
-
-It is the natural shape for an aerial platform that cannot see the water
-directly beneath it. But a gamma key and a **left truncation model the
-same phenomenon**, so applying both accounts for the blind spot twice.
-[`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md)
-warns when you do.
-
-## Plotting
-
-[`effect_estimates.ddf()`](https://camilleross.org/dsfit/reference/effect_estimates_ddf.md)
-makes a fitted detection function plottable with
-[fancyfx](https://github.com/chross22/fancyfx):
+## Model sets
 
 ``` r
 
-fancyfx::plotEffects(sw$fits[["hn"]], dat = detections, var = "distance")
+model_set(key = c("hn", "hr", "gamma"))
+model_set(key = "hn", adjustment = "cos", order = 3)   # cos orders 2 and 3
+model_set(key = "hn", formula = list(~1, ~beaufort))
 ```
 
-which gives the fitted g(x) with a delta-method ribbon and a rug of the
-observed distances above it — the standard detection-function
-diagnostic, and fancyfx’s premise applied almost exactly. `fancyfx` is a
-`Suggests`, so it is optional.
-
-One thing worth knowing: for a **covariate** model the area under that
-curve is not the `esw` in the selection table. `mrds` computes
-`average.p` as a Horvitz-Thompson mean, weighting each animal by the
-inverse of its own detection probability; the plotted curve is the plain
-mean over the animals as observed. They coincide only when detection
-probability is constant.
-
-## Availability
-
-`g(0)` has three components: the **geometric blind spot** under the
-aircraft, **availability** (whether the animal was at the surface to be
-seen), and **perception** (whether an observer who could have seen it
-did). Correcting for one while believing you have corrected for another
-is how these estimates go wrong by a factor rather than a percentage.
-
-dsfit computes only availability.
-[`availability()`](https://camilleross.org/dsfit/reference/availability.md)
-implements the Laake et al. (1997) equation from external dive data —
-surface and dive times, and the time an animal spends in view:
+## All covariate combinations
 
 ``` r
 
-a <- availability(surface = 2.4, dive = 8.1, t_w = 10)
+covs   <- c("beaufort", "glare", "size")
+combos <- unlist(lapply(seq_along(covs), function(k) combn(covs, k, simplify = FALSE)),
+                 recursive = FALSE)
+forms  <- c(list(~1), lapply(combos, reformulate))
+
+sw_cov <- sweep_models(detections, model_set(c("hn", "hr"), formula = forms),
+                       truncation = 400)
+selection_table(sw_cov)
 ```
 
-It **computes; it does not estimate.** There is no likelihood and no
-data being fitted — given dive parameters, the answer follows
-arithmetically, so its uncertainty is inherited from the dive study
-rather than from your survey. `ganley_surface_time()` carries the
-measured monthly surface times from Ganley et al. (2019), which vary
-enough month to month to rule out a constant.
+## Plot
 
-[`g0()`](https://camilleross.org/dsfit/reference/g0.md) assembles a full
-correction from components, keeps their sources named separately, and
-propagates the standard error.
+``` r
 
-→ [**Availability and the g(0)
-correction**](https://camilleross.org/dsfit/vignettes/availability.Rmd)
-is the reference: the equation and the window it depends on, why
-availability is a function of the window rather than a number, the
-output shape and its standard error, which of the three built-in
-datasets are real, what a sweep needs before you run one, what your data
-can and cannot support, and how to record where each component came
-from.
+fit <- sw$fits[["hn"]]
 
-## Distance sampling to modeling pipeline
+fancyfx::plotEffects(fit, dat = detections, var = "distance")
 
-    distsamp   NARWC survey data  ->  effort segments + detection distances
-       |
-    dsfit      detection functions: model set, sweep, selection table
-       |
-    analysis   which years, which truncation, which covariates, the report
+est <- effect_estimates_ddf(fit)    # .x, .estimate, .lower, .upper
+plot(est$.x, est$.estimate, type = "l", ylim = c(0, 1))
 
-The middle layer is a package because its logic needs tests. The outer
-layer is not, because its choices change every run.
+effect_estimates_ddf(sw_cov$fits[["hn beaufort"]], at = list(beaufort = 4))
+```
+
+## Binned distances
+
+``` r
+
+binned <- transform(detections, distbegin = floor(distance / 100) * 100)
+binned <- transform(binned, distend = distbegin + 100, distance = NULL)
+
+sweep_models(binned[binned$distend <= 400, ], model_set("hn"), truncation = 400)
+```
+
+## Availability and g(0)
+
+``` r
+
+avail <- availability(surface = 60, dive = 240, window = 24,
+                      se_surface = 8, se_dive = 25)
+
+perception <- data.frame(key = NA, component = "perception", value = 0.68,
+                         se = 0.09, source = "borrowed")
+g0(avail, perception)
+```
+
+Not applied to the fit. Divide abundance by it.
+
+## Selection table
+
+| Column              | Meaning                                               |
+|---------------------|-------------------------------------------------------|
+| `delta_aic`         | AIC difference from the lowest                        |
+| `p`, `p_cv`         | Average detection probability and its CV              |
+| `esw`               | Effective strip half-width, `p * (truncation - left)` |
+| `cvm_p` / `chisq_p` | Goodness of fit, exact / binned                       |
+| `converged`         | `FALSE` for a failed fit                              |
+
+## Other functions
+
+``` r
+
+view_window_aerial(trackline = 51.22, speed = 51.4, slope = 0.03)   # time in view
+view_window_vessel(radius = 6000, speed = 5.1)
+prepare_distance_data(detections, truncation = 400)                 # the input guards
+```
 
 ## Documentation
 
-|  |  |
+| Topic | File |
 |----|----|
-| [Getting started](https://camilleross.org/dsfit/vignettes/dsfit.Rmd) | a survey to work with, the model set, the sweep, and how to read the table |
-| [Availability and the g(0) correction](https://camilleross.org/dsfit/vignettes/availability.Rmd) | the one component dsfit computes, and how to assemble the rest |
+| Code guide | [docs/02-code-guide.md](https://camilleross.org/dsfit/docs/02-code-guide.md) ([PDF](https://camilleross.org/dsfit/docs/02-code-guide.pdf)) |
+| Design and guards | [docs/01-plan.md](https://camilleross.org/dsfit/docs/01-plan.md) |
+
+``` r
+
+vignette("dsfit", package = "dsfit")
+vignette("availability", package = "dsfit")
+```
 
 ## Citing dsfit
 
@@ -200,74 +157,5 @@ layer is not, because its choices change every run.
 citation("dsfit")
 ```
 
-That returns up to three entries — the package, the `mrds` toolchain
-every fit comes off, and the gamma key function if you selected a gamma
-model:
-
-    Ross, C. dsfit: Fit and Compare Detection Functions for Line-Transect Survey
-    Data. R package. https://github.com/chross22/dsfit
-
-    Miller, D.L., Rexstad, E., Thomas, L., Marshall, L. and Laake, J.L. (2019)
-    Distance sampling in R. Journal of Statistical Software 89(1):1-28.
-    doi:10.18637/jss.v089.i01
-
-    Becker, E.A. and Quang, P.X. (2009) A gamma-shaped detection function for
-    line-transect surveys with mark-recapture and covariate data. Journal of
-    Agricultural, Biological and Environmental Statistics 14:207-223.
-    doi:10.1198/jabes.2009.0013
-
-The package version comes from `DESCRIPTION` at install time, so it is
-always the version you actually have. Record the truncation and the
-model set as well: a selection table is not reproducible without them.
-
-## References
-
-What each source is relied on for is in
-[tools/citations.csv](https://camilleross.org/dsfit/tools/citations.csv).
-They are checked monthly by CI — DOIs still resolve and still describe
-the paper cited.
-
-Becker, E.A. and Quang, P.X. (2009) A gamma-shaped detection function
-for line-transect surveys with mark-recapture and covariate data.
-*Journal of Agricultural, Biological and Environmental Statistics*
-14:207–223. <https://doi.org/10.1198/jabes.2009.0013> — *the gamma key,
-and the aerial-survey case it was developed for.*
-
-Buckland, S.T., Anderson, D.R., Burnham, K.P., Laake, J.L., Borchers,
-D.L. and Thomas, L. (2001) *Introduction to Distance Sampling:
-Estimating Abundance of Biological Populations.* Oxford University
-Press. — *the standard line-transect reference.*
-
-Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what
-there is: estimating North Atlantic right whale *Eubalaena glacialis*
-local abundance. *Endangered Species Research* 38:101–113.
-<https://doi.org/10.3354/esr00938> — *availability from focal follows,
-the monthly variation that rules out a constant, and the measured time
-in view behind `ganley_surface_time`.*
-
-Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997)
-Probability of detecting harbor porpoise from aerial surveys: estimating
-g(0). *The Journal of Wildlife Management* 61:63–75.
-<https://doi.org/10.2307/3802415> — *the availability equation itself.*
-
-Laake, J.L. and Borchers, D.L. (2004) Methods for incomplete detection
-at distance zero. In *Advanced Distance Sampling*, pp. 108–189. Oxford
-University Press. — *why `g(0)` is not estimable from single-observer
-data.*
-
-Marques, F.F.C. and Buckland, S.T. (2004) Covariate models for the
-detection function. In *Advanced Distance Sampling*, pp. 31–47. Oxford
-University Press. — *covariate detection functions, which is what `mcds`
-fits.*
-
-Miller, D.L., Rexstad, E., Thomas, L., Marshall, L. and Laake, J.L.
-(2019) Distance sampling in R. *Journal of Statistical Software*
-89(1):1–28. <https://doi.org/10.18637/jss.v089.i01> — *the `Distance`
-and `mrds` toolchain this package fits through.*
-
-Roberts, J.J., Yack, T.M., Fujioka, E., Halpin, P.N., Baumgartner, M.F.
-and others (2024) North Atlantic right whale density surface model for
-the US Atlantic evaluated with passive acoustic monitoring. *Marine
-Ecology Progress Series* 732:167–192.
-<https://doi.org/10.3354/meps14547> — *corrections applied per platform,
-team and conditions, at continental scale.*
+Returns the package, `mrds` (Miller et al. 2019) and the gamma key
+(Becker and Quang 2009). Report the truncation and the model set.

@@ -71,8 +71,14 @@ of candidate models, one row each, ready for <code><a href="sweep_models.html">s
 
 
 <dt id="arg-order">order<a class="anchor" aria-label="anchor" href="#arg-order"></a></dt>
-<dd><p>Integer vector of adjustment orders. Ignored when <code>adjustment</code>
-is <code>NULL</code>.</p></dd>
+<dd><p>Integer vector of highest adjustment orders, one candidate per
+element. Orders are cumulative, as in <code>Distance::ds()</code>: each candidate
+carries every term of its series up to <code>order</code>, so <code>order = 3</code> on
+<code>hn</code> with <code>"cos"</code> fits <code>adj.order = c(2, 3)</code>. The series are cosine
+2, 3, 4, ... (1, 2, 3, ... for <code>unif</code>) and Hermite or simple polynomial
+4, 6, 8, ... (2, 4, 6, ... for <code>unif</code>). <code>NULL</code> (default) gives one term,
+the first of the series. An order outside a key's series is dropped with
+a warning. Ignored when <code>adjustment</code> is <code>NULL</code>.</p></dd>
 
 
 <dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
@@ -100,7 +106,9 @@ cost of a second parameter.</p></dd>
 
 <dt><code>"unif"</code></dt>
 <dd><p>Uniform. Detection certain out to the truncation distance —
-a strip transect. Only interesting with adjustment terms.</p></dd>
+a strip transect. Only interesting with adjustment terms, and takes no
+covariates, having no scale parameter for them to act on. Both cases
+are dropped with a warning.</p></dd>
 
 <dt><code>"gamma"</code></dt>
 <dd><p>Gamma. <strong>Unimodal, with its peak away from zero</strong>, so
@@ -114,9 +122,10 @@ directly.</p></dd>
     <h2 id="when-gamma-is-the-right-shape-and-when-it-is-a-trap">When gamma is the right shape, and when it is a trap<a class="anchor" aria-label="anchor" href="#when-gamma-is-the-right-shape-and-when-it-is-a-trap"></a></h2>
 
 
-<p>An aircraft cannot see the water directly beneath it. Where that is true the
-gamma key describes the survey rather than distorting it, and a half-normal
-forced through a peak at zero will misfit the near distances.</p>
+<p>An aircraft cannot see the water directly beneath it, and neither can a ship
+see past its own bow wave. Where that is true the gamma key describes the
+survey rather than distorting it, and a half-normal forced through a peak at
+zero will misfit the near distances.</p>
 <p>But a gamma key and a <strong>left truncation model the same phenomenon</strong>. Using
 both accounts for the blind spot twice. Pick one deliberately and record
 which — <code><a href="sweep_models.html">sweep_models()</a></code> takes <code>left</code> for the other route, and will warn if a
@@ -156,12 +165,12 @@ case it was developed for.</p>
 <span class="r-in"><span><span class="co"># With adjustments</span></span></span>
 <span class="r-in"><span><span class="fu">model_set</span><span class="op">(</span>key <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"hn"</span>, <span class="st">"hr"</span><span class="op">)</span>, adjustment <span class="op">=</span> <span class="st">"cos"</span>, order <span class="op">=</span> <span class="fl">2</span><span class="op">:</span><span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 4 × 6</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   model_id key   adjustment order formula dsmodel                               </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                                 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> hn+cos2  hn    cos            2 ~1      <span style="color: #949494;">"</span>~cds(key = \"hn\", formula = ~1, adj…</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> hr+cos2  hr    cos            2 ~1      <span style="color: #949494;">"</span>~cds(key = \"hr\", formula = ~1, adj…</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> hn+cos3  hn    cos            3 ~1      <span style="color: #949494;">"</span>~cds(key = \"hn\", formula = ~1, adj…</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> hr+cos3  hr    cos            3 ~1      <span style="color: #949494;">"</span>~cds(key = \"hr\", formula = ~1, adj…</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   model_id    key   adjustment order formula dsmodel                            </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                              </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> hn+cos(2)   hn    cos            2 ~1      <span style="color: #949494;">"</span>~cds(key = \"hn\", formula = ~1, …</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> hr+cos(2)   hr    cos            2 ~1      <span style="color: #949494;">"</span>~cds(key = \"hr\", formula = ~1, …</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> hn+cos(2,3) hn    cos            3 ~1      <span style="color: #949494;">"</span>~cds(key = \"hn\", formula = ~1, …</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> hr+cos(2,3) hr    cos            3 ~1      <span style="color: #949494;">"</span>~cds(key = \"hr\", formula = ~1, …</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># With a detection covariate</span></span></span>
 <span class="r-in"><span><span class="fu">model_set</span><span class="op">(</span>key <span class="op">=</span> <span class="st">"hn"</span>, formula <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">~</span><span class="fl">1</span>, <span class="op">~</span><span class="va">wt_beaufort</span><span class="op">)</span><span class="op">)</span></span></span>

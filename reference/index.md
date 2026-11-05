@@ -27,6 +27,9 @@ describing the window an observer could actually see through.
   : The time an animal stays within view of the platform
 - [`view_window_aerial()`](https://camilleross.org/dsfit/reference/view_window_aerial.md)
   : The time an animal stays in view of an aircraft
+- [`view_window_vessel()`](https://camilleross.org/dsfit/reference/view_window_vessel.md)
+  [`view_window_ship()`](https://camilleross.org/dsfit/reference/view_window_vessel.md)
+  : The time an animal stays in view of a vessel
 
 ## Detection on the line
 
