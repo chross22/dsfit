@@ -1,57 +1,67 @@
 #' Build a set of candidate detection functions
 #'
-#' Expands key functions, adjustment terms, and covariate formulas into a grid
-#' of candidate models, one row each, ready for [sweep_models()].
+#' Expands key functions, adjustment series and covariate formulas into a grid
+#' of candidate models, one row per candidate. Pass the result to
+#' [sweep_models()] to fit them all.
 #'
-#' @section The key functions:
+#' @section How it works:
+#' 1. Checks that every key, adjustment series, order and formula is valid.
+#' 2. Crosses keys, series, orders and formulas into a grid.
+#' 3. Drops, with a warning, candidates that cannot be fitted meaningfully:
+#'    a uniform key with no adjustment, a uniform key with covariates, and an
+#'    adjustment order outside its series.
+#' 4. Builds each candidate's `mrds` model string and its `model_id` label.
+#' 5. Drops, with a warning, duplicate candidates.
+#'
+#' @section Key functions:
 #' \describe{
-#'   \item{`"hn"`}{Half-normal. A shoulder at zero and a smooth fall-off; the
+#'   \item{`"hn"`}{Half-normal. A shoulder at zero and a smooth fall-off. The
 #'     usual default.}
-#'   \item{`"hr"`}{Hazard-rate. A broader shoulder and a heavier tail, at the
-#'     cost of a second parameter.}
-#'   \item{`"unif"`}{Uniform. Detection certain out to the truncation distance —
-#'     a strip transect. Only interesting with adjustment terms, and takes no
-#'     covariates, having no scale parameter for them to act on. Both cases
-#'     are dropped with a warning.}
-#'   \item{`"gamma"`}{Gamma. **Unimodal, with its peak away from zero**, so
-#'     detection is lowest on the track-line. Not available in
-#'     `Distance::ds()`, which is one reason this package fits through `mrds`
-#'     directly.}
+#'   \item{`"hr"`}{Hazard-rate. A broader shoulder and a heavier tail, with a
+#'     second parameter.}
+#'   \item{`"unif"`}{Uniform. Detection is certain out to the truncation
+#'     distance, which is a strip transect. It is kept only with adjustment
+#'     terms. It takes no covariates, because it has no scale parameter for
+#'     them to act on.}
+#'   \item{`"gamma"`}{Gamma. Unimodal, with its peak away from zero, so
+#'     detection is lowest on the track-line. `mrds` scales it to 1 at its
+#'     peak, not at zero. Not available in `Distance::ds()`.}
 #' }
 #'
-#' @section When gamma is the right shape, and when it is a trap:
-#' An aircraft cannot see the water directly beneath it, and neither can a ship
-#' see past its own bow wave. Where that is true the gamma key describes the
-#' survey rather than distorting it, and a half-normal forced through a peak at
-#' zero will misfit the near distances.
-#'
-#' But a gamma key and a **left truncation model the same phenomenon**. Using
-#' both accounts for the blind spot twice. Pick one deliberately and record
-#' which — [sweep_models()] takes `left` for the other route, and will warn if a
-#' model set containing gamma is fitted with one.
-#'
-#' Note also that gamma does not assume `g(0) = 1`, so its `p̄` is not
-#' comparable to a half-normal's in the way a shared assumption would make it.
-#' That is a reason to read the whole selection table rather than its first row.
+#' @section Gamma key and left truncation:
+#' An aircraft cannot see the water directly beneath it, and a ship cannot see
+#' past its bow wave. For such a platform the gamma key fits the near distances
+#' better than a half-normal, which must peak at zero. Left truncation models
+#' the same blind spot by discarding the near distances. Use one or the other,
+#' not both. [sweep_models()] takes `left` and warns if it is set for a model
+#' set that contains the gamma key.
 #'
 #' @param key Character vector of key functions: any of `"hn"`, `"hr"`,
-#'   `"unif"`, `"gamma"`.
-#' @param adjustment Adjustment series: `NULL` (none), `"cos"`, `"herm"`, or
-#'   `"poly"`. A vector expands to one candidate per series.
+#'   `"unif"`, `"gamma"`. Default `c("hn", "hr")`.
+#' @param adjustment Character vector of adjustment series: `"cos"` (cosine),
+#'   `"herm"` (Hermite polynomial) or `"poly"` (simple polynomial). One
+#'   candidate per series. `NULL` (default) fits no adjustment terms.
 #' @param order Integer vector of highest adjustment orders, one candidate per
-#'   element. Orders are cumulative, as in `Distance::ds()`: each candidate
-#'   carries every term of its series up to `order`, so `order = 3` on
-#'   `hn` with `"cos"` fits `adj.order = c(2, 3)`. The series are cosine
-#'   2, 3, 4, ... (1, 2, 3, ... for `unif`) and Hermite or simple polynomial
-#'   4, 6, 8, ... (2, 4, 6, ... for `unif`). `NULL` (default) gives one term,
-#'   the first of the series. An order outside a key's series is dropped with
-#'   a warning. Ignored when `adjustment` is `NULL`.
+#'   element. Orders are cumulative, as in `Distance::ds()`: a candidate carries
+#'   every term of its series up to `order`. For example, `order = 3` on `"hn"`
+#'   with `"cos"` fits `adj.order = c(2, 3)`. Cosine orders run 2, 3, 4, ...
+#'   (1, 2, 3, ... for `"unif"`). Hermite and polynomial orders run 4, 6, 8, ...
+#'   (2, 4, 6, ... for `"unif"`). `NULL` (default) gives the first term of the
+#'   series only. An order outside its series is dropped with a warning.
+#'   Ignored when `adjustment` is `NULL`.
 #' @param formula One-sided formula, or a list of them, giving detection
-#'   covariates. `~1` (default) is no covariates. Anything else fits through
-#'   `mcds` rather than `cds`.
+#'   covariates. `~1` (default) means no covariates and fits with `cds`; any
+#'   other formula fits with `mcds`.
 #'
-#' @return A tibble with one row per candidate: `model_id`, `key`,
-#'   `adjustment`, `order`, `formula`, and the `dsmodel` string `mrds` is given.
+#' @return A tibble with one row per candidate and columns:
+#' \describe{
+#'   \item{`model_id`}{Label, e.g. `"hn"`, `"hr+cos(2,3)"`, `"hn wt_beaufort"`.}
+#'   \item{`key`}{Key function.}
+#'   \item{`adjustment`}{Adjustment series, or `NA`.}
+#'   \item{`order`}{Highest adjustment order, or `NA`.}
+#'   \item{`formula`}{Covariate formula as a string.}
+#'   \item{`dsmodel`}{The model formula string passed to `mrds::ddf()`.}
+#' }
 #'
 #' @references
 #' Buckland, S.T., Anderson, D.R., Burnham, K.P., Laake, J.L., Borchers, D.L.
@@ -64,26 +74,28 @@
 #' Becker, E.A. and Quang, P.X. (2009) A gamma-shaped detection function for
 #' line-transect surveys with mark-recapture and covariate data. *Journal of
 #' Agricultural, Biological and Environmental Statistics* 14:207-223.
-#' \doi{10.1198/jabes.2009.0013} The gamma key function, and the aerial-survey
-#' case it was developed for.
+#' \doi{10.1198/jabes.2009.0013} Source of the gamma key, developed for aerial
+#' surveys.
 #'
 #' @seealso [sweep_models()]
 #'
 #' @examples
+#' # Default: half-normal and hazard-rate, no adjustments or covariates
 #' model_set()
 #'
-#' # With adjustments
+#' # Cosine adjustments up to orders 2 and 3
 #' model_set(key = c("hn", "hr"), adjustment = "cos", order = 2:3)
 #'
-#' # With a detection covariate
+#' # With and without a detection covariate
 #' model_set(key = "hn", formula = list(~1, ~wt_beaufort))
 #'
-#' # The unimodal key, for a platform with a blind spot beneath it
+#' # The gamma key, for a platform that cannot see beneath itself
 #' model_set(key = c("hn", "gamma"))
 #'
 #' @export
 model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
                       formula = ~1) {
+  # 1. Validate the key functions
   key <- as.character(key)
   if (!is.null(adjustment)) adjustment <- as.character(adjustment)
   known_key <- c("hn", "hr", "unif", "gamma")
@@ -96,6 +108,8 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
     ))
   }
 
+  # 2. Validate the adjustment series and orders. Orders matter only when
+  #    there is a series to apply them to.
   known_adj <- c("cos", "herm", "poly")
   if (!is.null(adjustment)) {
     bad <- setdiff(adjustment, known_adj)
@@ -112,6 +126,8 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
     }
   }
 
+  # 3. Validate the covariate formulas. A single formula is wrapped in a list
+  #    so one and several are handled alike.
   formulas <- if (inherits(formula, "formula")) list(formula) else formula
   if (!all(vapply(formulas, inherits, logical(1), "formula")) ||
       any(lengths(formulas) != 2L)) {
@@ -121,6 +137,8 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
     ))
   }
 
+  # 4. Cross every key, series, order and formula. Formulas enter by
+  #    position (`formula_i`) so the grid holds only plain vectors.
   grid <- expand.grid(
     key = key,
     adjustment = if (is.null(adjustment)) NA_character_ else adjustment,
@@ -130,9 +148,9 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
     KEEP.OUT.ATTRS = FALSE
   )
 
-  # A uniform key with no adjustment is a flat line: detection certain out to
-  # the truncation distance. That is a strip transect, not a detection
-  # function, and fitting it as one is almost never what was meant.
+  # 5. Drop the uniform key without adjustments. It is a flat line (certain
+  #    detection out to the truncation distance), i.e. a strip transect, not
+  #    a detection function.
   drop <- grid$key == "unif" & is.na(grid$adjustment)
   if (any(drop)) {
     rlang::warn(paste0(
@@ -143,10 +161,10 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
     grid <- grid[!drop, , drop = FALSE]
   }
 
-  # Covariates act on the key's scale parameter, and the uniform key has none.
-  # mrds accepts the formula and ignores it, so `unif+cos(1) bf` fits as
-  # `unif+cos(1)` - same parameters, same AIC - and the table would carry a
-  # duplicate labelled as a covariate model.
+  # 6. Drop the uniform key with covariates. Covariates act on the scale
+  #    parameter, which the uniform key lacks. mrds ignores the formula, so
+  #    `unif+cos(1) bf` would fit as `unif+cos(1)` and appear twice in the
+  #    table under different labels.
   form_chr <- vapply(formulas, deparse_formula, character(1))
   covariate <- !vapply(trimws(form_chr), identical, logical(1), "~1")
   drop <- grid$key == "unif" & covariate[grid$formula_i]
@@ -160,10 +178,10 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
     grid <- grid[!drop, , drop = FALSE]
   }
 
-  # Adjustment orders are cumulative, as in Distance::ds(): a candidate carries
-  # every term of its series up to its order. An order outside the series - a
-  # cosine order 1 on a key that already has the first term's shape, or an odd
-  # Hermite order - is not a model mrds can fit, and failed inside it.
+  # 7. Expand each highest order into the full set of orders it carries
+  #    (cumulative, as in Distance::ds()). Drop orders outside the series,
+  #    such as cosine order 1 on a non-uniform key or an odd Hermite order:
+  #    mrds cannot fit them and would fail inside the sweep.
   adj <- !is.na(grid$adjustment)
   grid$orders <- vector("list", nrow(grid))
   grid$orders[adj] <- Map(adjustment_orders, grid$key[adj],
@@ -184,6 +202,8 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
     rlang::abort("No candidate models left after validation.")
   }
 
+  # 8. Build the output: one row per candidate, with its mrds model string
+  #    and its label.
   out <- tibble::tibble(
     key = grid$key,
     adjustment = grid$adjustment,
@@ -201,9 +221,9 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
                 out$formula[i])
   }, character(1))
 
-  # Repeated keys, orders or formulas give identical candidates under one
-  # model_id: the fits list cannot tell them apart, and each would sit at
-  # delta AIC 0 beside its twin.
+  # 9. Drop duplicates. Repeated keys, orders or formulas give identical
+  #    candidates with the same model_id; the fits list could not tell them
+  #    apart, and each would tie at delta AIC 0 with its copy.
   dup <- duplicated(out$model_id)
   if (any(dup)) {
     rlang::warn(paste0(
@@ -216,10 +236,16 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
   out[, c("model_id", "key", "adjustment", "order", "formula", "dsmodel")]
 }
 
+# Turn a formula into one line of text, e.g. `~wt_beaufort`.
+# Input: a formula. Returns: a length-1 character string. deparse() can split
+# a long formula over several strings, so they are pasted back together.
 deparse_formula <- function(f) paste(deparse(f), collapse = " ")
 
-# The dsmodel string mrds is handed. `cds` when there are no covariates,
-# `mcds` when there are - they are the same family, but mcds carries a scale
+# Build the `dsmodel` formula string passed to mrds::ddf().
+# Inputs: key, adjustment series (or NA), the vector of adjustment orders, and
+# the covariate formula as text. Returns a string such as
+# `~cds(key = "hn", formula = ~1, adj.series = "cos", adj.order = c(2, 3))`.
+# `cds` is used without covariates and `mcds` with them; mcds carries a scale
 # formula and cds does not.
 build_dsmodel <- function(key, adjustment, order, formula) {
   covariate <- !identical(trimws(formula), "~1")
@@ -237,6 +263,9 @@ build_dsmodel <- function(key, adjustment, order, formula) {
   paste0("~", fn, "(", paste(parts, collapse = ", "), ")")
 }
 
+# Build the human-readable model_id for one candidate.
+# Inputs: as for build_dsmodel(). Returns a string such as `"hr+cos(2,3)"` or
+# `"hn wt_beaufort"`: key, then adjustment orders, then covariates (no `~`).
 label_model <- function(key, adjustment, order, formula) {
   out <- key
   if (!is.na(adjustment)) {
@@ -248,9 +277,14 @@ label_model <- function(key, adjustment, order, formula) {
   out
 }
 
-# The orders a candidate carries, following Distance's get_adj_orders(): the
-# series for the key and adjustment, up to `max`. `NA` gives the first term
-# alone. NULL when `max` is not in the series.
+# List the adjustment orders a candidate carries, following Distance's
+# get_adj_orders().
+# Inputs: key, adjustment series, and the highest order `max` (NA for none
+# given). Returns an integer vector from the first order of the series up to
+# `max`; the first order alone when `max` is NA; NULL when `max` is not a
+# member of the series.
+# Series: cosine starts at 2 (1 for unif) in steps of 1; Hermite and
+# polynomial start at 4 (2 for unif) in steps of 2.
 adjustment_orders <- function(key, adjustment, max) {
   if (adjustment == "cos") {
     start <- if (key == "unif") 1L else 2L
@@ -264,6 +298,8 @@ adjustment_orders <- function(key, adjustment, max) {
   seq.int(start, max, by = step)
 }
 
+# Write adjustment orders as R code for the dsmodel string.
+# Input: integer vector. Returns `"2"` for one order, `"c(2, 3)"` for several.
 format_orders <- function(order) {
   if (length(order) == 1L) as.character(order) else
     paste0("c(", paste(order, collapse = ", "), ")")

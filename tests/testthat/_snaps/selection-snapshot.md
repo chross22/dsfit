@@ -8,32 +8,6 @@
       2 gamma      TRUE     2 2186.97      9.92 0.3010 0.074 120.4 0.498   0.339
       3    hr      TRUE     2 2187.24     10.18 0.3781 0.064 151.3 0.786   0.126
 
-# the ranking over adjustment series and orders is stable
-
-    Code
-      snap_table(sw)
-    Output
-                    model converged n_par     aic delta_aic      p  p_cv   esw cvm_p
-      1     unif+cos(1,2)      TRUE     2 2178.68      0.00 0.3707 0.040 148.3 0.527
-      2         hn+cos(2)      TRUE     2 2179.05      0.38 0.3489 0.084 139.6 0.931
-      3        hn+herm(4)      TRUE     2 2179.06      0.38 0.3499 0.073 140.0 0.925
-      4       hn+cos(2,3)      TRUE     3 2179.71      1.03 0.3243 0.108 129.7 0.909
-      5 unif+cos(1,2,3,4)      TRUE     4 2180.35      1.67 0.3338 0.093 133.5 0.959
-      6   unif+cos(1,2,3)      TRUE     3 2180.49      1.81 0.3615 0.104 144.6 0.744
-      7     hn+cos(2,3,4)      TRUE     4 2180.71      2.03 0.3402 0.127 136.1 0.975
-      8    unif+herm(2,4)      TRUE     2 2199.47     20.79 0.4862 0.066 194.5 0.000
-      9      unif+herm(2)      TRUE     1 2272.34     93.66 0.6679 0.082 267.2 0.001
-        chisq_p
-      1   0.462
-      2   0.530
-      3   0.531
-      4   0.598
-      5   0.601
-      6   0.435
-      7   0.591
-      8   0.004
-      9   0.000
-
 # the binned likelihood is stable
 
     Code

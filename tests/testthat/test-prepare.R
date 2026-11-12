@@ -218,3 +218,11 @@ test_that("breaks given with exact distances are ignored, with a warning", {
   expect_warning(prepare_distance_data(exact_data(), truncation = 400,
                                        breaks = c(0, 200, 400)), "ignored")
 })
+
+test_that("circling distances beyond the truncation are not counted", {
+  # Only rows that will be fitted are checked: a break-off distance that
+  # truncation drops anyway is not refused.
+  d <- with_sources(c(rep("angle", 8), "break_off", "circling"))
+  d$distance[9:10] <- c(900, 950)
+  expect_silent(prepare_distance_data(d, truncation = 400))
+})

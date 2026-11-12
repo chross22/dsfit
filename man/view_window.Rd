@@ -2,65 +2,59 @@
 % Please edit documentation in R/availability.R
 \name{view_window}
 \alias{view_window}
-\title{The time an animal stays within view of the platform}
+\title{Time in view for a circular viewing area}
 \usage{
 view_window(radius, speed, distance = 0)
 }
 \arguments{
-\item{radius}{Radius of the viewing area, in metres.}
+\item{radius}{Numeric. Radius of the viewing area, in metres. Must be
+positive.}
 
-\item{speed}{Platform ground speed, in metres per second.}
+\item{speed}{Numeric. Platform ground speed, in metres per second. Must be
+positive.}
 
-\item{distance}{Perpendicular distance, in metres. \code{0} (default) is on the
-trackline, which gives the widest window.}
+\item{distance}{Numeric. Perpendicular distance, in metres. Default \code{0}, the
+trackline, which gives the widest window. Must not be negative.}
 }
 \value{
-A numeric vector of window durations in seconds, \code{0} where \code{distance}
-exceeds \code{radius}.
+A numeric vector of windows in seconds, \code{0} where \code{distance} exceeds
+\code{radius}.
 }
 \description{
-Turns platform geometry into the \code{window} \code{\link[=availability]{availability()}} needs: how long a
-point on the water remains inside the observers' field of view as the platform
-passes.
+Computes the \code{window} for \code{\link[=availability]{availability()}} when the observers watch a
+circular area around the platform, fore and aft alike. The window is the
+time a point on the water spends inside that circle as the platform passes.
+For an aircraft side window use \code{\link[=view_window_aerial]{view_window_aerial()}}; for a ship's
+forward search use \code{\link[=view_window_vessel]{view_window_vessel()}}.
 }
-\section{The geometry}{
+\section{How it works}{
 
-For a circular field of view of radius \eqn{r} and a platform travelling at
-speed \eqn{v}, a point at perpendicular distance \eqn{x} is crossed along a
-chord of length \eqn{2\sqrt{r^2 - x^2}}, so
+For a viewing radius \eqn{r} and platform speed \eqn{v}, a point at
+perpendicular distance \eqn{x} is crossed along a chord of length
+\eqn{2\sqrt{r^2 - x^2}}, so
 
 \deqn{w(x) = \frac{2\sqrt{r^2 - x^2}}{v}}
 
-The window therefore shrinks with perpendicular distance, and is zero beyond
-the edge of the view — an animal outside it is never available, which this
-returns as \code{0} rather than as an error.
+The window is widest on the trackline, shrinks with distance, and is \code{0}
+beyond the radius.
 }
 
-\section{This is the wrong geometry for most aerial surveys}{
+\section{Which platform this fits}{
 
-A circular viewing area is what a platform watching a fixed patch has. An
-\strong{aircraft observer looking through a side window does not have one}: the
-field of view is an angular wedge running forward and aft, so an animal
-further off the trackline sits in that wedge \emph{longer}, not less. The window
-\strong{grows} with perpendicular distance, and this function has the sign of that
-effect backwards for such a platform.
-
-Ganley et al. (2019) measured it for the Skymaster flown over Cape Cod Bay
-and found time in view rising from about 50 s near the trackline to about
-130 s at 3 km, a slope of roughly 0.03 s per metre. Use
-\code{\link[=view_window_aerial]{view_window_aerial()}} there. This function is for a genuinely circular view,
-and is kept because that case exists — not because it is the default worth
-reaching for.
-
-Measuring the window, as Ganley et al. did by timing a navigation buoy
-through the field of view, beats deriving it from either formula.
+Only a platform that watches a circular area. An aircraft observer looking
+through a side window sees a wedge running forward and aft, so time in view
+grows with perpendicular distance instead of shrinking; this function gets
+that direction wrong. Ganley et al. (2019) measured time in view rising
+with distance for their aircraft, at about 0.03 s per metre. A window
+measured in the field, as they did by timing a buoy through the field of
+view, is better than any of these formulas.
 }
 
 \examples{
 # A 300 m viewing radius at 50 m/s, on the trackline
 view_window(radius = 300, speed = 50)
 
-# The window narrows away from the trackline, and closes at the edge
+# The window narrows away from the trackline and is 0 beyond the radius
 view_window(radius = 300, speed = 50, distance = c(0, 150, 290, 400))
 
 }
@@ -68,11 +62,10 @@ view_window(radius = 300, speed = 50, distance = c(0, 150, 290, 400))
 Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there
 is: estimating North Atlantic right whale \emph{Eubalaena glacialis} local
 abundance. \emph{Endangered Species Research} 38:101-113.
-\doi{10.3354/esr00938} Time in view measured for an aerial platform, and why
-it rises rather than falls with perpendicular distance.
+\doi{10.3354/esr00938} Time in view measured for an aircraft, rising with
+perpendicular distance.
 }
 \seealso{
-\code{\link[=view_window_aerial]{view_window_aerial()}} for an aircraft's forward-and-aft field of
-view, which is the usual case here, and \code{\link[=view_window_vessel]{view_window_vessel()}} for a ship's
-forward search arc. \code{\link[=availability]{availability()}} for what the window feeds.
+\code{\link[=view_window_aerial]{view_window_aerial()}} for an aircraft, \code{\link[=view_window_vessel]{view_window_vessel()}} for
+a ship, and \code{\link[=availability]{availability()}} for what the window feeds.
 }

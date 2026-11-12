@@ -236,3 +236,19 @@ test_that("zero rows is a failure, not an ok", {
   out <- report(survey()[0, ], model_set("hn"), truncation = 3000)
   expect_match(out, "FAIL  0 rows")
 })
+
+test_that("covariate checks use the rows that will be fitted", {
+  # Empty samples carry NA covariates, but they are dropped before fitting.
+  d <- survey(300, sd = 100, beaufort = rep(0:4, 60))
+  d <- rbind(d, data.frame(object = 301:320, distance = NA, beaufort = NA))
+  out <- report(d, model_set("hn", formula = ~beaufort), truncation = 3000)
+  expect_no_match(out, "missing values")
+})
+
+test_that("too few detections to classify the onset is a note, not an ok", {
+  # 30 detections with a 500 m empty strip, and gamma in the set.
+  d <- survey(30, blind = 500, sd = 800)
+  out <- report(d, model_set(c("hn", "gamma")), truncation = 3000)
+  expect_match(out, "note  no detections inside")
+  expect_no_match(out, "rise into the empty strip to")
+})

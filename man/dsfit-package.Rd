@@ -8,41 +8,54 @@
 \description{
 Fits a set of candidate detection functions to line-transect distance data and compares them on the quantities that matter for abundance, not on AIC alone. Models are fitted through 'mrds' so that every candidate comes off the same likelihood machinery and the gamma key function is available alongside half-normal, hazard-rate and uniform. Enforces the conditions under which a comparison is meaningful: truncation must be held constant within a model set, and binned and exact distances cannot be ranked together. Reports effective strip half-width and its coefficient of variation next to each fit, since two models within two AIC of one another can imply materially different abundance. Takes the flatfile produced by 'distsamp' or any equivalent table.
 }
-\section{Where this sits}{
+\section{Main functions}{
+
+\describe{
+\item{\code{\link[=model_set]{model_set()}}}{Builds the grid of candidate detection functions.}
+\item{\code{\link[=diagnose_sweep]{diagnose_sweep()}}}{Checks data and a model set for common problems
+before anything is fitted.}
+\item{\code{\link[=prepare_distance_data]{prepare_distance_data()}}}{Validates distances and applies the
+truncation. Called by \code{\link[=sweep_models]{sweep_models()}}; also usable on its own.}
+\item{\code{\link[=sweep_models]{sweep_models()}}}{Fits every candidate with \code{mrds::ddf()} and builds
+a selection table.}
+\item{\code{\link[=selection_table]{selection_table()}}}{Returns the ranked table from a sweep.}
+\item{\code{\link[=detection_structure]{detection_structure()}}}{Reports what a table of detections can
+support, such as exact or binned distances and double-observer data.}
+\item{\code{\link[=availability]{availability()}}, \code{\link[=g0]{g0()}}}{Build a \code{g(0)} correction from external
+data, for use at the abundance step.}
+}
+}
+
+\section{Where the package sits}{
 
 \code{dsfit} is the middle of three layers. \code{distsamp} turns NARWC-format survey
-data into effort segments and detection distances; \code{dsfit} fits and compares
-detection functions; an analysis repository holds the choices that change
-every run — which years, which truncation, which covariates.
-
-The split exists so that the part with testable logic is a package and the
-part with project-specific choices is not.
+data into effort segments and detection distances. \code{dsfit} fits and compares
+detection functions. A separate analysis repository holds the per-run
+choices: years, truncation, covariates. Logic that can be tested lives in
+the package; project-specific choices do not.
 }
 
-\section{Why not \code{Distance::ds()}}{
+\section{Why models are fitted through mrds}{
 
-\code{Distance} is the right tool for fitting one model interactively, and this
-package does not replace it. But \code{ds()} offers \code{hn}, \code{hr}, and \code{unif} only,
-and the gamma key — the natural model for a platform that cannot see
-beneath itself, whether flat aircraft windows or a hull — is available in
-\code{mrds} alone. Fitting the whole model set
-through \code{mrds::ddf()} also keeps every AIC in a selection table coming off
-the same likelihood machinery, rather than mixing two wrappers' handling of
-truncation and monotonicity and presenting the difference as a model
-difference.
+\code{Distance::ds()} is a good tool for fitting one model interactively, and
+\code{dsfit} does not replace it. \code{ds()} offers only the \code{hn}, \code{hr} and \code{unif}
+keys. The gamma key, which suits a platform that cannot see directly beneath
+itself, is available only in \code{mrds}. Fitting every candidate through
+\code{mrds::ddf()} also means every AIC in a selection table comes from the same
+likelihood code, with the same handling of truncation and monotonicity.
 }
 
-\section{What it will not do}{
+\section{g(0) is not estimated}{
 
-Estimate \code{g(0)}. Every fit conditions on the animal having been available and
-seen, and a mis-specified \code{g(0)} shifts every candidate in a model set by the
-same factor — so the ranking looks untouched while the density is wrong.
-It cannot be estimated from sighting distances alone: availability needs dive
-data, and perception needs a double-observer structure that some NARWC
-programmes recorded and many did not (\code{\link[=detection_structure]{detection_structure()}} says which a
-given extract has). Correct for
-it at the abundance step, from external sources, with its standard error
-propagated.
+\code{g(0)} is the probability of detecting an animal on the track-line. Every
+fit assumes \code{g(0) = 1}. A wrong \code{g(0)} scales every candidate by the same
+factor, so the model ranking is unchanged while density is biased.
+\code{g(0)} cannot be estimated from sighting distances alone. Availability needs
+dive data, and perception needs a double-observer design that some NARWC
+programmes recorded and many did not; \code{\link[=detection_structure]{detection_structure()}} reports which
+a given extract has. Apply the correction at the abundance step, from
+external sources, and propagate its standard error. \code{\link[=availability]{availability()}} and
+\code{\link[=g0]{g0()}} build that correction.
 }
 
 \references{

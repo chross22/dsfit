@@ -24,46 +24,41 @@ local abundance. \emph{Endangered Species Research} 38:101-113.
 ganley_detection
 }
 \description{
-Table S2 of Ganley et al. (2019): the goodness-of-fit and average detection
-probability of a separately fitted detection function for each year from 1998
-to 2017, from aerial line-transect surveys of Cape Cod Bay.
+Table S2 of Ganley et al. (2019): goodness-of-fit p-values and average
+detection probability for a detection function fitted separately to each
+year from 1998 to 2017, from aerial line-transect surveys of Cape Cod Bay.
 }
-\section{This is \code{p}, not perception bias}{
+\section{This is \code{p}, not perception}{
 
-\code{p} here is the average detection probability of the fitted detection
-function — the same quantity \code{\link[=selection_table]{selection_table()}} reports as \code{p}, with its
-standard error as \code{p_se}. It is \strong{not} a \code{g(0)} component. Ganley et al.
-say so directly: perception bias "was not addressed directly in this study",
-because estimating it needs a second observer team they did not have.
-
-The distinction matters because the two are easy to conflate and correcting
-for one while believing you have corrected for the other is how these
-estimates go wrong by a factor. See \code{\link[=g0]{g0()}}, which will name any component
-you have not supplied.
+\code{p} is the average detection probability of the fitted detection function,
+the same quantity \code{\link[=selection_table]{selection_table()}} reports as \code{p} (with standard error
+\code{p_se}). It is not a \code{g(0)} component. Ganley et al. state that perception
+bias was not addressed in their study, because estimating it needs a
+second observer team. Correcting for one while believing you have corrected
+for the other biases abundance by a factor. \code{\link[=g0]{g0()}} names any standard
+component that is missing.
 }
 
-\section{What it is good for}{
+\section{What it is useful for}{
 
-It is a long, real example of the thing \code{\link[=sweep_models]{sweep_models()}} is built around:
-\strong{detection probability is not a constant of the survey}. Twenty years of
-the same programme, the same aircraft and the same bay give \code{p} between
-0.431 and 0.866 — a twofold range — with standard errors spanning an order
-of magnitude, from 0.028 to 0.333.
+It is a long, real example that detection probability is not a constant of
+a survey. Twenty years of the same programme, aircraft and bay give \code{p}
+between 0.431 and 0.866, with standard errors from 0.028 to 0.333.
 
-The goodness-of-fit columns are worth reading next to it. Ganley et al. took
-p > 0.05 as adequate fit, and 2003 fails on Kolmogorov-Smirnov (0.048) while
-passing Cramér-von Mises (0.103); it also carries much the largest standard
-error on \code{p}. A model can top a ranking and still fail a fit test, which is
-why \code{\link[=selection_table]{selection_table()}} carries \code{cvm_p} alongside the AIC.
+The goodness-of-fit columns show that a model can rank well and still fail
+a fit test. Ganley et al. took p > 0.05 as adequate fit. 2003 fails
+Kolmogorov-Smirnov (0.048) but passes Cramér-von Mises (0.103), and has the
+largest standard error on \code{p}. This is why \code{\link[=selection_table]{selection_table()}} reports
+\code{cvm_p} alongside AIC.
 }
 
 \examples{
 ganley_detection
 
-# Detection probability is not a constant of a survey programme
+# Detection probability varies from year to year
 range(ganley_detection$p)
 
-# The year that fails Kolmogorov-Smirnov also has the worst precision on p
+# The year that fails Kolmogorov-Smirnov also has the least precise p
 ganley_detection[ganley_detection$ks_p < 0.05, ]
 }
 \seealso{

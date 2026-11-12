@@ -8,22 +8,22 @@
 A tibble with 4 rows and 8 columns:
 \describe{
 \item{month}{Month, as an ordered factor from January to April.}
-\item{percent_surface_time}{Percent of time at the surface. See above for
-why this is not the ratio of the two interval columns.}
+\item{percent_surface_time}{Percent of time at the surface. Not the ratio
+of the two interval columns; see above.}
 \item{mean_dive}{Mean diving interval, seconds.}
 \item{mean_surface}{Mean surfacing interval, seconds.}
 \item{availability}{Median availability, \eqn{a(x)}.}
 \item{availability_variance}{As labelled in the source; see above.}
-\item{n_follows}{Focal follows behind each row. January's 7 against
-April's 48 is worth noticing — the month with the lowest availability is
-also the one measured least well, because the weather that keeps the food
-deep also keeps observers on the ground.}
+\item{n_follows}{Number of focal follows. January has 7 and April 48:
+the month with the lowest availability is also the least measured,
+because the weather that keeps the food deep also keeps observers
+on the ground.}
 \item{hours_followed}{Total follow time, hours.}
 }
 
-The pooled "All sightings" row of Table S1 is kept as the \code{all_sightings}
-attribute rather than a fifth row, so it cannot be summed or plotted
-alongside the months by accident.
+The pooled "All sightings" row of Table S1 is stored as the
+\code{all_sightings} attribute, not as a fifth row, so it is not summed or
+plotted with the months by mistake.
 }
 \source{
 Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not
@@ -36,71 +36,74 @@ ganley_availability
 }
 \description{
 Table S1 of Ganley et al. (2019): mean dive and surface intervals, percent
-surface time, and median availability, from 86 focal follows of North
-Atlantic right whales in Cape Cod Bay during 2016 and 2017. Unlike
-\link{example_dive_intervals}, these are real measurements.
+time at the surface, and median availability, from 86 focal follows of North
+Atlantic right whales in Cape Cod Bay in 2016 and 2017. These are real
+measurements, unlike \link{example_dive_intervals}.
 }
 \details{
-Availability runs from \strong{0.27 in January to 0.91 in April}, as the copepods
-the whales feed on move up through the water column. That threefold swing
-across one season is the case against a constant \code{g(0)}, in measurements.
+Availability runs from 0.27 in January to 0.91 in April, as the copepods
+the whales feed on move up through the water column. This threefold change
+within one season is measured evidence against a constant \code{g(0)}.
 }
 \section{Three things not to do with these columns}{
 
 \describe{
 \item{Do not treat \code{percent_surface_time} as
-\eqn{E(s)/(E(s)+E(d))}}{It is not. January is listed at 16\% with a mean
-surface interval of 48 s and a mean dive of 533 s, and
-\eqn{48/(48+533)} is 8.3\%. The gap appears every month and in both
-directions — April's intervals give 90\% against a listed 55\%. The
-percentage is evidently a mean of per-follow percentages while the
-interval columns are means of intervals: a mean of ratios against a
-ratio of means. So it is \strong{not} the instantaneous availability, and
-using it as one would be wrong by up to 35 percentage points.}
+\eqn{E(s)/(E(s)+E(d))}}{The two do not match. January lists 16\%, but
+its mean intervals (48 s surface, 533 s dive) give
+\eqn{48/(48+533)} = 8.3\%. The mismatch occurs every month and in both
+directions: April's intervals give 90\% against a listed 55\%. The
+percentage appears to be a mean of per-follow percentages, while the
+interval columns are means of intervals (a mean of ratios against a
+ratio of means). Using it as instantaneous availability would be wrong
+by up to 35 percentage points.}
 \item{Do not expect \code{\link[=availability]{availability()}} to reproduce
-\code{availability}}{The reported figure is a median over bootstrap
-replicates, and \eqn{a(x)} varies with distance through the time in
-view. Working backwards from the tabulated means, January's 0.27
-implies a window near 122 s and April's 0.91 one near 8 s — they are not
-evaluated at a common window. The values are measurements to be used,
-not outputs to be recomputed.}
-\item{Do not feed \code{availability_variance} to \code{\link[=g0]{g0()}} without
-deciding what it is}{It is labelled a variance and runs 0.04–0.09. Read
-literally, January's standard error is \eqn{\sqrt{0.04} = 0.2} against
-an estimate of 0.27 — a CV of 74\%, which would dominate any correction
-it entered. Read as a standard error instead, the CV is 15\%. Neither
-matches the very small error bars in the paper's Fig. 4A. It is shipped
-under the paper's own label and deliberately not converted.}
+\code{availability}}{The reported value is a median over bootstrap
+replicates, and availability depends on the time in view, which varies
+with distance. Working back from the tabulated means, January's 0.27
+implies a window near 122 s and April's 0.91 a window near 8 s, so the
+months were not evaluated at a common window. Use the values as
+measurements; do not recompute them.}
+\item{Do not pass \code{availability_variance} to \code{\link[=g0]{g0()}} without deciding what
+it is}{It is labelled a variance and ranges from 0.04 to 0.09. Read as
+a variance, January's standard error is \eqn{\sqrt{0.04} = 0.2} against
+an estimate of 0.27, a CV of 74\%, which would dominate any correction.
+Read as a standard error, the CV is 15\%. Neither matches the very small
+error bars in the paper's Fig. 4A. The column keeps the paper's label
+and is not converted.}
 }
 }
 
-\section{The platform}{
+\section{The survey platform}{
 
-Cessna 336/337 Skymaster at 185 km/h and 228 or 304 m altitude, surveying
-January to May. Time in view at the effective trackline was \strong{51.22 s},
-rising with perpendicular distance — see \code{\link[=view_window_aerial]{view_window_aerial()}}. Their
-trackline is at 100 m rather than 0 m because the aircraft's flat windows
-leave a blind spot beneath it, and the surveys were left-truncated there
-accordingly — the same blind spot \code{sweep_models(left = )} and the gamma key
-handle at the fitting end.
+A Cessna 336/337 Skymaster at 185 km/h and 228 or 304 m altitude, surveying
+January to May. Time in view at the effective trackline was 51.22 s, rising
+with perpendicular distance (see \code{\link[=view_window_aerial]{view_window_aerial()}}). The effective
+trackline is at 100 m, not 0 m, because the aircraft's flat windows leave a
+blind spot beneath it, and the surveys were left-truncated at 100 m. At the
+fitting end the same blind spot is handled by \code{sweep_models(left = )} or the
+gamma key.
 }
 
 \section{Two inconsistencies in the source}{
 
-Recorded so they are not mistaken for transcription errors. February's
-sample size is 9 in Table S1, summing to the 86 its own total row gives, but
-10 in the Fig. 2 caption, summing to the 87 the Methods states. And April's
-availability is 0.91 here and in Section 3.1, while the abstract gives the
-seasonal range as 0.27–0.85. Table S1 is followed here, being the tabulated
-source.
+These are in the paper, not transcription errors.
+\itemize{
+\item February's sample size is 9 in Table S1 (summing to the table's
+total of 86) but 10 in the Fig. 2 caption (summing to the 87 stated in
+the Methods).
+\item April's availability is 0.91 in Table S1 and Section 3.1, but the
+abstract gives the seasonal range as 0.27-0.85.
+}
+Table S1 is followed here, as the tabulated source.
 }
 
 \examples{
 ganley_availability
 
-# The measured seasonal swing, as a g(0) component. A standard error has to
-# be decided on first - see above on the variance column. This takes the
-# literal reading, the column as a variance; decide before relying on it.
+# The monthly values as a g(0) component. A standard error must be chosen
+# first (see the variance column above). This example reads the column as a
+# variance; decide which reading is right before relying on it.
 avail <- data.frame(
   key = as.character(ganley_availability$month),
   component = "availability",
@@ -109,6 +112,7 @@ avail <- data.frame(
 )
 suppressWarnings(g0(avail))
 
+# The pooled row
 attr(ganley_availability, "all_sightings")$availability
 }
 \seealso{

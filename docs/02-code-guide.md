@@ -18,11 +18,13 @@ and is described at its interface only. Effort, segmentation and the
 derivation of distances belong to `distsamp` and are described where they
 reach this package.
 
-Line references are to the source as of the revision date (`R/sweep.R:111`).
+Line references are to the source as of the revision date (`R/sweep.R:122`).
 Code excerpts are abridged to the lines that carry the logic; the file and
 line given with each are where the full code is. The
 architecture and the list of guards are in `docs/01-plan.md`; this chapter
 does not repeat the reasoning there, and explains the code as it now stands.
+How to run an analysis with the package is in
+`docs/03-running-a-pipeline.md`.
 
 Terms used throughout:
 
@@ -43,19 +45,19 @@ Terms used throughout:
 
 | Step | Function | File | Produces |
 |---|---|---|---|
-| 0 | `detection_structure()` (optional) | `R/structure.R:58` | what the data can support, by question |
-| 0 | `diagnose_sweep()` (optional) | `R/diagnose.R:42` | a printed report; nothing fitted |
-| 1 | `check_mrds()` | `R/sweep.R:378` | an error if `mrds` is absent |
-| 2 | `model_set()` | `R/model-set.R:85` | one row per candidate, with its `dsmodel` string |
-| 3 | `prepare_distance_data()` | `R/prepare.R:66` | `data`, `binned`, `breaks`, `n_dropped`, `dropped` |
-| 3a | `check_circling()` | `R/prepare.R:243` | an error or warning for circling-derived distances |
-| 3b | `derive_breaks()` | `R/prepare.R:290` | cutpoints, for binned data without `breaks` |
-| 4 | `mrds::ddf()` per candidate | `R/sweep.R:147` | `fits`, named by `model_id`; `NULL` for a failure |
-| 5 | `build_selection_table()` | `R/sweep.R:223` | the table, sorted by AIC |
-| 5a | `fit_summary()` | `R/sweep.R:257` | `n_par`, `p`, `p_se`, `esw`, goodness of fit |
-| 5b | `fit_gof()` | `R/sweep.R:303` | `cvm_p`, `chisq_p` |
-| 6 | `report_sweep()`, `print.dsfit_sweep()` | `R/sweep.R:317`, `R/print.R:2` | the message and the printed summary |
-| 7 | `effect_estimates.ddf()` | `R/effect-estimates.R:106` | `g(x)` on a grid, with a delta-method band |
+| 0 | `detection_structure()` (optional) | `R/structure.R:127` | what the data can support, by question |
+| 0 | `diagnose_sweep()` (optional) | `R/diagnose.R:122` | a printed report; nothing fitted |
+| 1 | `check_mrds()` | `R/sweep.R:438` | an error if `mrds` is absent |
+| 2 | `model_set()` | `R/model-set.R:96` | one row per candidate, with its `dsmodel` string |
+| 3 | `prepare_distance_data()` | `R/prepare.R:108` | `data`, `binned`, `breaks`, `n_dropped`, `dropped` |
+| 3a | `check_circling()` | `R/prepare.R:310` | an error or warning for circling-derived distances |
+| 3b | `derive_breaks()` | `R/prepare.R:369` | cutpoints, for binned data without `breaks` |
+| 4 | `mrds::ddf()` per candidate | `R/sweep.R:167` | `fits`, named by `model_id`; `NULL` for a failure |
+| 5 | `build_selection_table()` | `R/sweep.R:265` | the table, sorted by AIC |
+| 5a | `fit_summary()` | `R/sweep.R:299` | `n_par`, `p`, `p_se`, `esw`, goodness of fit |
+| 5b | `fit_gof()` | `R/sweep.R:342` | `cvm_p`, `chisq_p` |
+| 6 | `report_sweep()`, `print.dsfit_sweep()` | `R/sweep.R:361`, `R/print.R:7` | the message and the printed summary |
+| 7 | `effect_estimates.ddf()` | `R/effect-estimates.R:111` | `g(x)` on a grid, with a delta-method band |
 | 8 | `availability()`, `view_window*()`, `g0()` | `R/availability.R`, `R/g0.R` | a `dsfit_g0` for the abundance step |
 
 Steps 0 and 8 sit outside the fitting path. Step 0 runs the same guards as
@@ -69,7 +71,7 @@ sw   <- sweep_models(flat, model_set(c("hn", "hr", "gamma")), truncation = 2000)
 selection_table(sw)
 ```
 
-## 3. `prepare_distance_data()` — `R/prepare.R:66`
+## 3. `prepare_distance_data()` — `R/prepare.R:108`
 
 ### 3.1 Argument checks and the distance type
 
@@ -93,11 +95,11 @@ truncation as text, and a factor as level codes. Negative values are an
 error, since a perpendicular distance has no side. Zero rows, and distance
 columns that are present but entirely missing, each have their own message.
 
-### 3.2 Circling-derived distances — `check_circling()`, `R/prepare.R:243`
+### 3.2 Circling-derived distances — `check_circling()`, `R/prepare.R:310`
 
 ```r
 src    <- as.character(data$distance_source)
-fitted <- !is.na(data$distance)
+fitted <- !is.na(d) & d >= lower & d <= truncation
 n_break <- sum(fitted & src %in% "break_off")   # error
 n_circ  <- sum(fitted & src %in% "circling")    # warning
 ```
@@ -138,13 +140,13 @@ from one that discarded half the survey. `diagnose_sweep()` prints it.
 3. Rows with `distend > truncation` or `distbegin < left` are removed. A bin
    is kept or dropped whole; it is never split.
 4. `breaks` are derived (Section 3.6) if not given. Supplied `breaks` are
-   checked by `check_breaks()` (`R/prepare.R:317`): they must be
+   checked by `check_breaks()` (`R/prepare.R:403`): they must be
    strictly increasing and contain every recorded bin edge. The likelihood
    uses each row's own `distbegin`/`distend`, but goodness of fit uses
    `breaks`, so cutpoints across the recorded bins left AIC unchanged and
    computed the chi-square over bins nobody surveyed.
-5. The top break must equal `truncation` (`R/prepare.R:173`).
-6. The bottom break must equal `left`, or zero without it (`R/prepare.R:188`).
+5. The top break must equal `truncation` (`R/prepare.R:231`).
+6. The bottom break must equal `left`, or zero without it (`R/prepare.R:245`).
 7. The `distance` column is removed. A flatfile carries it, all `NA`, on
    binned rows, and `mrds` read it as the distances: every candidate failed
    with "no data to analyze".
@@ -169,11 +171,11 @@ Truncation is inclusive at both ends. An empty result is an error rather than
 an empty fit. Empty `distbegin`/`distend` columns are removed, since `mrds`
 otherwise warns once per candidate that the data has bins. `breaks` given
 with exact distances is ignored, with a warning. `ensure_object()`
-(`R/prepare.R:337`) adds a sequential `object` column when absent, and refuses
+(`R/prepare.R:428`) adds a sequential `object` column when absent, and refuses
 repeated values: `mrds` keys detections on it and rejects duplicates with a
 message that begins with a newline.
 
-### 3.6 `derive_breaks()` — `R/prepare.R:290`
+### 3.6 `derive_breaks()` — `R/prepare.R:369`
 
 The unique `(distbegin, distend)` pairs are sorted by `distbegin`, and each
 pair's end must equal the next pair's start. A gap or an overlap means the
@@ -185,7 +187,7 @@ recorded edge is snapped to its representative before bins are compared.
 Bins converted between units otherwise failed to tile against themselves:
 `0.1 * 3` and `0.3` are different doubles.
 
-## 4. `model_set()` — `R/model-set.R:85`
+## 4. `model_set()` — `R/model-set.R:96`
 
 ### 4.1 Validation and the grid
 
@@ -193,12 +195,12 @@ Keys are checked against `hn`, `hr`, `unif`, `gamma`; adjustment series
 against `cos`, `herm`, `poly`; factors are taken as character. `order` must
 be whole numbers. `formula` is a one-sided formula or a list of them; a
 two-sided one is refused. `expand.grid()`
-(`R/model-set.R:124`) crosses key, adjustment, order and formula index.
+(`R/model-set.R:142`) crosses key, adjustment, order and formula index.
 
 Two uniform-key candidates are removed with a warning. With no adjustment
-(`R/model-set.R:136`) it is a flat function, a strip transect, and fitting it
+(`R/model-set.R:154`) it is a flat function, a strip transect, and fitting it
 as a candidate is almost never what was meant. With a covariate formula
-(`R/model-set.R:152`) the formula has nothing to act on: covariates enter
+(`R/model-set.R:170`) the formula has nothing to act on: covariates enter
 through the scale parameter, which the uniform key lacks, and `mrds` ignores
 the formula rather than refusing it. Kept, the candidate would duplicate the
 uniform model without covariates under a covariate label.
@@ -207,7 +209,7 @@ Candidates with the same `model_id` (repeated keys, orders or formulas) are
 dropped with a warning after the grid is built. Kept, `fits` could not tell
 them apart and each would sit at `delta_aic` 0 beside its twin.
 
-### 4.2 The `dsmodel` string — `build_dsmodel()`, `R/model-set.R:224`
+### 4.2 The `dsmodel` string — `build_dsmodel()`, `R/model-set.R:250`
 
 ```r
 fn <- if (covariate) "mcds" else "cds"
@@ -224,7 +226,7 @@ and passed to `stats::as.formula()` at fit time, so the model a row describes
 is readable without refitting. `label_model()` builds `model_id` as
 `key[+adjustment(orders)][ covariates]`, for example `hn+cos(2,3) bf`.
 
-### 4.3 Cumulative adjustment orders — `adjustment_orders()`, `R/model-set.R:254`
+### 4.3 Cumulative adjustment orders — `adjustment_orders()`, `R/model-set.R:288`
 
 ```r
 if (adjustment == "cos") { start <- if (key == "unif") 1 else 2; step <- 1 }
@@ -247,7 +249,7 @@ naming it, rather than passed to `mrds`, where it failed.
 | `hn`, `hr`, `gamma` | 2, 3, 4, ... | 4, 6, 8, ... |
 | `unif` | 1, 2, 3, ... | 2, 4, 6, ... |
 
-## 5. `sweep_models()` — `R/sweep.R:111`
+## 5. `sweep_models()` — `R/sweep.R:122`
 
 ### 5.1 Arguments and settings
 
@@ -264,10 +266,10 @@ if (prepared$binned) { meta$binned <- TRUE; meta$breaks <- prepared$breaks }
 
 The same width, left truncation and bins are passed to every candidate,
 which is what makes the AICs comparable. `models` is checked by
-`check_model_set()` (`R/sweep.R:366`): it must have the columns
+`check_model_set()` (`R/sweep.R:422`): it must have the columns
 `model_set()` returns, and at least one row.
 
-### 5.2 Monotonicity — `monotonicity()`, `R/sweep.R:350`
+### 5.2 Monotonicity — `monotonicity()`, `R/sweep.R:401`
 
 ```r
 constrain <- !is.na(model$adjustment) && model$key != "gamma" &&
@@ -283,7 +285,7 @@ with AIC 3399.27 against 3401.50 from `ds()`. Constrained, the AIC and `p`
 match `ds()` exactly. A key alone is monotone already. The gamma key is
 excluded because it rises to a peak by design.
 
-### 5.3 The fitting loop — `R/sweep.R:147`
+### 5.3 The fitting loop — `R/sweep.R:167`
 
 ```r
 fit <- try(mrds::ddf(dsmodel = stats::as.formula(models$dsmodel[i]),
@@ -310,7 +312,7 @@ a `NULL` in `fits`. `fits[i] <- list(NULL)` is used rather than
 `fits[[i]] <- NULL`, which would delete the element, shorten the list, and
 move every later fit onto the wrong row of the table.
 
-`first_line()` (`R/sweep.R:358`) keeps the first non-empty line of an
+`first_line()` (`R/sweep.R:411`) keeps the first non-empty line of an
 `mrds` error. Some begin with a newline, and keeping the text before it gave
 a blank reason.
 
@@ -318,16 +320,16 @@ a blank reason.
 can therefore depend on the session's random state; a seed set before the
 sweep makes it repeat.
 
-### 5.4 The selection table — `build_selection_table()`, `R/sweep.R:223`
+### 5.4 The selection table — `build_selection_table()`, `R/sweep.R:265`
 
 One row per candidate, failed or not. `converged` is `!is.null(fit)`, which
 after Section 5.3 means converged. `vapply()` carries the names of `fits`
 onto every column, and they are removed with `unname()` so a column pulled
 out is a bare vector. `delta_aic` is `NA` throughout when every candidate
-failed (`R/sweep.R:245`), rather than `NA - Inf` with a warning from
+failed (`R/sweep.R:282`), rather than `NA - Inf` with a warning from
 `min()`. Rows are ordered by AIC with failures last.
 
-### 5.5 Per-fit quantities — `fit_summary()`, `R/sweep.R:257`
+### 5.5 Per-fit quantities — `fit_summary()`, `R/sweep.R:299`
 
 ```r
 left <- if (is.null(s$left)) 0 else s$left
@@ -336,11 +338,11 @@ esw  <- p * (scalar(s$width) - left)
 ```
 
 `average.p` is the mean of `g(x)` over `(left, width)`, so the strip it
-scales is `width - left`. `scalar()` (`R/sweep.R:286`) returns `NA` for a
+scales is `width - left`. `scalar()` (`R/sweep.R:330`) returns `NA` for a
 field that `mrds` left empty or absent, so a single malformed summary cannot
 stop the table being built. `p_cv` is `p_se / p`, computed in the table.
 
-### 5.6 Goodness of fit — `fit_gof()`, `R/sweep.R:303`
+### 5.6 Goodness of fit — `fit_gof()`, `R/sweep.R:342`
 
 `mrds::ddf.gof(f, qq = FALSE)` is called once per fit. `cvm_p` is taken from
 `dsgof$CvM$p`, which `mrds` computes for exact distances only. `chisq_p` is
@@ -359,7 +361,7 @@ rows with whichever goodness-of-fit column applies: chi-square when every
 
 ## 6. Pre-flight checks
 
-### 6.1 `detection_structure()` — `R/structure.R:58`
+### 6.1 `detection_structure()` — `R/structure.R:127`
 
 Reports, per question, whether the table supports it: `TRUE`, `FALSE`, or
 `NA` where the structure is present but incomplete. Covariate candidates are
@@ -375,12 +377,12 @@ in upper case, since NARWC's are upper case and a flatfile's often are not:
 `latitude` is LATITUDE, and `BEAUFORT` beside `beaufort` is one variable
 named twice.
 
-`perception_structure()` (`R/structure.R:237`) requires `observer` and
+`perception_structure()` (`R/structure.R:324`) requires `observer` and
 `detected`, at least two observers, and an `object` that appears twice.
 Availability is always reported as unsupported: it cannot be estimated from
 distances.
 
-### 6.2 `diagnose_sweep()` — `R/diagnose.R:42`
+### 6.2 `diagnose_sweep()` — `R/diagnose.R:122`
 
 Runs in order: toolchain, `detection_structure()`, `prepare_distance_data()`,
 sample size, model set, blind spot, covariates. Each finding is printed as
@@ -391,28 +393,34 @@ Guard warnings, such as the circling warning of Section 3.2, are caught with
 warnings after the report. A table with no distances at all is a `FAIL`
 line, not an `ok`. `models` is checked as in Section 5.1.
 
+The constant and missing-value covariate checks use the rows that will be
+fitted, after truncation. Checked on the full table, a flatfile's empty
+samples, whose covariates are `NA`, raised a false missing-value warning.
+
 The truncation-loss warning (over half lost) counts rows beyond the
 truncation or inside `left` against the rows that have a distance. Counted
 against all rows, a flatfile's samples with no detection read as truncation
 loss, and the warning blamed the units.
 
 The blind-spot check fires when the nearest detection exceeds 2% of the
-truncation width. `onset_shape()` (`R/diagnose.R:293`) then compares the
+truncation width. `onset_shape()` (`R/diagnose.R:403`) then compares the
 first of 20 equal bins above that distance with the modal bin; a ratio above
 0.6 is classed as an abrupt edge, which `left` removes and no key function
-reproduces.
+reproduces. With fewer than 40 detections the onset is "unknown"; with the
+gamma key in the set this is reported as a `note`, not as an `ok` claiming
+the detections rise into the strip.
 
-## 7. `effect_estimates.ddf()` — `R/effect-estimates.R:106`
+## 7. `effect_estimates.ddf()` — `R/effect-estimates.R:111`
 
 ### 7.1 Arguments
 
 `interval` and `scale` are resolved by `resolve_choice()`
-(`R/effect-estimates.R:229`) rather than `match.arg()`, because
+(`R/effect-estimates.R:265`) rather than `match.arg()`, because
 `fancyfx::plotEffects()` forwards its own unresolved default vectors.
 `"auto"` becomes `"se"`; `"cri"` is refused. `var` must be `"distance"`. The
 grid runs from `left` (or 0) to `width`.
 
-### 7.2 The averaged curve — `averaged_g()`, `R/effect-estimates.R:190`
+### 7.2 The averaged curve — `averaged_g()`, `R/effect-estimates.R:210`
 
 ```r
 design <- as.data.frame(dm)
@@ -435,15 +443,15 @@ expanded with the scale matrix so the two stay the same length. The uniform
 key has neither matrix, and is evaluated once on the grid; the expansion
 previously produced an empty grid and every value was `NaN`.
 
-`covariate_object()` (`R/effect-estimates.R:243`) rebuilds the scale design
+`covariate_object()` (`R/effect-estimates.R:287`) rebuilds the scale design
 matrix from the model's data with the `at` values substituted, so named
 covariates are fixed and the rest are averaged as observed. `at_value()`
-(`R/effect-estimates.R:272`) puts a value for a factor or character covariate on
+(`R/effect-estimates.R:330`) puts a value for a factor or character covariate on
 the observed levels, so `at = list(plat = "B")` works and an unknown level is
 refused by name; a one-level character column made `model.matrix()` fail
 with a message about contrasts.
 
-### 7.3 The band — `delta_se()`, `R/effect-estimates.R:289`
+### 7.3 The band — `delta_se()`, `R/effect-estimates.R:357`
 
 The Jacobian of the averaged curve with respect to the parameters is taken by
 `numDeriv::jacobian()` and combined with `solve(model$hessian)`. The band is
@@ -453,7 +461,7 @@ are `NA` and a warning is given, so the curve is still returned.
 
 ## 8. The `g(0)` slot
 
-### 8.1 `availability()` — `R/availability.R:137`
+### 8.1 `availability()` — `R/availability.R:146`
 
 Implements Laake et al. (1997):
 
@@ -462,7 +470,7 @@ $$a = \frac{E(s) + E(d)\left(1 - e^{-w/E(d)}\right)}{E(s) + E(d)}$$
 per row, with `surface`, `dive` and `window` each of length 1 or the longest
 length; other lengths are an error rather than recycled by position. The standard
 error is the delta method on `(surface, dive)` with their covariance matrix,
-by `numDeriv::grad()` in `availability_se()` (`R/availability.R:562`). It is
+by `numDeriv::grad()` in `availability_se()` (`R/availability.R:583`). It is
 `NA` when no standard errors are given. Giving one of `se_surface` and
 `se_dive` without the other is an error. The result has the component shape
 `key`, `component`, `value`, `se`.
@@ -471,9 +479,9 @@ by `numDeriv::grad()` in `availability_se()` (`R/availability.R:562`). It is
 
 | Function | Geometry | `w(x)` |
 |---|---|---|
-| `view_window()` (`R/availability.R:275`) | circular patch of radius `r` | `2 sqrt(r^2 - x^2) / v` |
-| `view_window_aerial()` (`R/availability.R:363`) | side-window wedge, half-angle `theta` forward and aft | `alpha + 2 x tan(theta) / v`, or `alpha + slope * x` |
-| `view_window_vessel()` (`R/availability.R:490`) | forward sector of half-angle `theta` from the bow | `(sqrt(r^2 - x^2) - x / tan(theta)) / v`, floored at 0 |
+| `view_window()` (`R/availability.R:285`) | circular patch of radius `r` | `2 sqrt(r^2 - x^2) / v` |
+| `view_window_aerial()` (`R/availability.R:376`) | side-window wedge, half-angle `theta` forward and aft | `alpha + 2 x tan(theta) / v`, or `alpha + slope * x` |
+| `view_window_vessel()` (`R/availability.R:499`) | forward sector of half-angle `theta` from the bow | `(sqrt(r^2 - x^2) - x / tan(theta)) / v`, floored at 0 |
 
 `view_window_ship()` is an alias for `view_window_vessel()`. In the vessel
 case the animal enters the view where it crosses the search radius and leaves
@@ -489,15 +497,15 @@ Ganley et al. (2019) fitted the linear form empirically and did not define
 an angle; their 0.03 s per metre at 51.4 m/s is `theta` of about 37.6
 degrees.
 
-### 8.3 `g0()` — `R/g0.R:112`
+### 8.3 `g0()` — `R/g0.R:138`
 
 Component tables are stacked, with `source` added as `NA` when absent. The
 following are errors: a component with no rows, no name, an empty-string
 key, a non-numeric `value` or `se`, a missing or non-finite `se`, a value
 outside `(0, 1]`, several unkeyed rows of one component, and a component
 whose keys differ from the others
-(`R/g0.R:201`). A missing `availability` or `perception` component is a
-warning. Per key (`R/g0.R:247`), the value is the product of the matching
+(`R/g0.R:237`). A missing `availability` or `perception` component is a
+warning. Per key (`R/g0.R:285`), the value is the product of the matching
 components and the CV is the root sum of squared component CVs, which is the
 delta method under independence. An unkeyed single-row component applies to
 every key.
@@ -506,13 +514,13 @@ every key.
 
 | Constraint | Where enforced | Consequence if broken |
 |---------|-------|------------|
-| One truncation, `left` and set of bins for every candidate | `sweep_models()`, `R/sweep.R:136` | AICs from different data are ranked together. |
+| One truncation, `left` and set of bins for every candidate | `sweep_models()`, `R/sweep.R:154` | AICs from different data are ranked together. |
 | Adjustment models constrained monotone, as in `Distance` | `monotonicity()` | g(x) above 1; AIC and `p` differ from `ds()`. |
 | Guards before fitting | `prepare_distance_data()` called before the loop | `mrds` errors on mixed or open-ended data, or fits it silently. |
 | Failed fits leave a `NULL` in place | `fits[i] <- list(NULL)` | Later models take the previous model's fit and row. |
-| Unconverged fits are failures | `R/sweep.R:166` | The table cannot be built; previously stopped the sweep. |
+| Unconverged fits are failures | `R/sweep.R:188` | The table cannot be built; previously stopped the sweep. |
 | `esw` uses `width - left` | `fit_summary()` | `esw`, and density, overstated by `left / (width - left)`. |
-| Binned breaks span `(left, width)` exactly | `R/prepare.R:173`, `R/prepare.R:188` | Unaccounted effort at either end of the strip. |
+| Binned breaks span `(left, width)` exactly | `R/prepare.R:231`, `R/prepare.R:245` | Unaccounted effort at either end of the strip. |
 | Shape and scale design matrices expanded together | `averaged_g()` | Hazard-rate and gamma curves fail or recycle. |
 | Circling checked on fitted rows only | `check_circling()` | Rows dropped for no distance are reported twice. |
 
@@ -548,7 +556,17 @@ reported by more than one are marked †.
 | Documentation: the curve and `average.p` were said to differ by "a fraction of a percent" (3.5% on the package's fixture); `selection_table()`, `availability()` and package help misstated their return or scope; `NEWS.md` described a test that no longer exists; `docs/01-plan.md` gave a stale test count and an AIC claim the snapshot contradicts; data help called Ganley et al. both paywalled and CC-BY. | Each corrected. |
 | Tests that could not fail: a blind-spot test matching text the code never prints; a failure test asserting only `is.logical()`; a covariance test asserting only inequality; an `mcds` snapshot that never checked `mcds`. | Each asserts the behaviour now. |
 
-### 10.2 First audit, 2026-11-04
+### 10.2 Found during the documentation rewrite, 2026-11-12
+
+| Defect | Correction |
+|--------------|----------|
+| `check_circling()` counted rows beyond the truncation, so a break-off distance that truncation would drop was still refused. | Only rows within `left` to `truncation` are counted. |
+| `diagnose_sweep()` checked covariates on the full table: a flatfile's empty samples raised a false missing-value warning. | Checked on the rows that will be fitted (Section 6.2). |
+| With too few detections to classify the onset, `diagnose_sweep()` printed an `ok` saying detections rise into the strip whenever gamma was in the set. | Reported as a `note` (Section 6.2). |
+| `build_selection_table()` carried two unused locals. | Removed. |
+| The adjustment-model snapshot failed CI on Linux and Windows: the monotonicity constraint's optimiser gives `p` differing in the fourth decimal across platforms (0.3337 against 0.3338), and two models 0.0006 AIC apart swapped rows. | That test compares against reference values with a 0.1% relative tolerance, rows in locale-independent order. The five unconstrained snapshots are unchanged. |
+
+### 10.3 First audit, 2026-11-04
 
 | Defect | Correction |
 |--------------|----------|
@@ -592,6 +610,7 @@ reported by more than one are marked †.
 | `R CMD check --no-manual`, after the first audit | 0 errors, 0 warnings, 1 note (unchanged); 446 expectations pass, 0 fail, 0 test warnings |
 | Monotone `hr+cos(2)` against `Distance::ds()` defaults | AIC 3401.498 both; `p` 0.4570 both |
 | `R CMD check --no-manual`, after the second audit | 0 errors, 0 warnings, 0 notes; 508 expectations pass, 0 fail, 0 skipped, 0 test warnings; both vignettes build |
+| `R CMD check --no-manual`, after the documentation rewrite | 0 errors, 0 warnings, 0 notes; 521 expectations pass, 0 fail, 0 skipped, 0 test warnings; both vignettes build |
 | `hn+cos(2,3)` against `Distance::ds(order = c(2, 3))` | AIC 2179.705 both; 3 parameters |
 | Uniform key with a covariate, before fix | `unif+cos1 bf` and `unif+cos1`: 1 parameter each, AIC 1633.22 each |
 

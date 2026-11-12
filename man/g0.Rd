@@ -2,105 +2,112 @@
 % Please edit documentation in R/g0.R
 \name{g0}
 \alias{g0}
-\title{Assemble a g(0) correction from its named components}
+\title{Combine g(0) components into one correction}
 \usage{
 g0(...)
 }
 \arguments{
-\item{...}{One or more component tables, each with \code{key}, \code{component},
-\code{value} and \code{se} columns, and optionally \code{source}. \code{\link[=availability]{availability()}} returns
-this shape.}
+\item{...}{One or more data frames of components, each with columns \code{key}
+(character, or \code{NA} to apply to every key), \code{component} (name, such as
+\code{"availability"}), \code{value} (probability in (0, 1]) and \code{se} (standard
+error, finite and not negative), and optionally \code{source} (character).
+\code{\link[=availability]{availability()}} returns this shape.}
 }
 \value{
-An object of class \code{dsfit_g0}: a list with \code{table} (one row per key,
-carrying \code{value}, \code{se} and \code{cv}) and \code{components} (the rows it was built
-from, \code{source} included, kept so the correction can always be taken apart
-again).
+An object of class \code{dsfit_g0}: a list with
+\describe{
+\item{table}{A tibble with one row per key: \code{key}, \code{value} (the
+combined \code{g(0)}), \code{se} and \code{cv}. If no component is keyed there is one
+row with \code{key = NA}.}
+\item{components}{A tibble of the input rows (\code{key}, \code{component},
+\code{value}, \code{se}, \code{source}), kept so the correction can be taken apart
+again.}
+}
 }
 \description{
-Stacks the components of \code{g(0)} — availability, perception, anything else
-measured separately — multiplies them, and propagates their variance. The
-result is an object to hand to the abundance step, not a number applied here.
+Combines the separately measured components of \code{g(0)} (availability,
+perception, and any others), multiplies them per key, and propagates their
+standard errors. Use it to hand a documented correction to the abundance
+step; \code{dsfit} does not apply the correction itself.
 }
-\section{Why this is an object and not an argument}{
+\section{Why the result is an object}{
 
-\code{dsfit} fits detection functions; it does not compute abundance. The
-correction is applied one layer out, where density is calculated, and that
-layer is a \code{targets} repository rather than a package.
-
-What this can do from here is make the correction impossible to get wrong
-quietly. A \code{dsfit_g0} cannot be built without naming its components, cannot
-be built without standard errors, and cannot be built at all by accident —
-so whatever consumes it downstream is handed a documented object rather than
-a bare number of unknown provenance.
+\code{dsfit} fits detection functions and does not compute abundance. The
+correction is applied where density is calculated, outside this package.
+A \code{dsfit_g0} object records which components went in, where each came
+from, and its standard error, so that what reaches the abundance step is
+not a bare number of unknown origin.
 }
 
-\section{The three rules}{
+\section{Rules enforced}{
 
-From \code{docs/01-plan.md}, and each one is enforced rather than documented:
-
+These follow \code{docs/01-plan.md}.
 \describe{
-\item{Never silently 1}{There is no default. A component that is absent is
-warned about by name, because assuming perception is 1 while believing
-you have corrected for it is how these estimates go wrong by a factor.}
-\item{Propagate the variance or refuse}{A component without a standard
-error is an error, not a point estimate. The CV of \code{g(0)} routinely
-dominates the CV of abundance, so dropping it inverts which uncertainty
-matters.}
-\item{Name the components separately}{Availability, perception and the
-geometric blind spot are three different things measured three different
-ways. They are kept as rows, not collapsed, so it stays visible which
-have been applied.}
+\item{No silent default of 1}{At least one component is required. A
+missing \code{"availability"} or \code{"perception"} component is named in a
+warning and in the printout. Assuming a component is 1 while believing
+it was corrected for biases abundance by a factor.}
+\item{A standard error is required}{A component with an \code{NA} standard
+error is an error. The CV of \code{g(0)} often dominates the CV of
+abundance, so leaving it out understates the uncertainty.}
+\item{Components are kept separate}{Availability, perception and the
+geometric blind spot are measured in different ways. Each is kept as
+its own rows, so it stays visible which have been applied.}
 }
 }
 
-\section{How the components combine}{
+\section{How it works}{
 
-Multiplicatively, and independently — availability comes from dive data and
-perception from a double-observer trial, so they are estimated from separate
-studies and the covariance between them is not merely unknown but usually
-undefined.
-
-Under independence the delta method gives a result worth remembering: the
-squared CVs add.
+Components are assumed independent, because they come from separate
+studies (dive data for availability, double-observer trials for
+perception). Under independence the delta method gives the coefficient of
+variation (CV) of the product as
 
 \deqn{CV(g_0)^2 = \sum_i CV(x_i)^2}
 
-So the least precise component sets the floor. A perception estimate with a
-30\% CV cannot be rescued by an availability estimate with a 2\% one.
+so the least precise component sets the floor: a perception CV of 30\%
+cannot be offset by an availability CV of 2\%.
+\enumerate{
+\item Each component table is checked for the columns \code{key}, \code{component},
+\code{value} and \code{se}, and at least one row. A missing \code{source} column is
+filled with \code{NA}.
+\item The tables are stacked. Every row must have a component name, a
+standard error, and a value in (0, 1].
+\item Keys are checked (see below).
+\item A warning is given for each of \code{"availability"} and \code{"perception"}
+that is absent.
+\item For each key, the matching rows are multiplied to give \code{value}, and
+\eqn{CV = \sqrt{\sum (se/value)^2}} gives \code{cv}; \code{se} is
+\code{value * cv}.
+}
 }
 
-\section{Keys, and the trap in them}{
+\section{Keys}{
 
-Components are matched on \code{key}. A component with a single \code{NA} key applies
-to every key — a perception estimate that does not vary by month, say,
-combined with availability that does.
+Components are matched on \code{key} (for example a month). A component given as
+a single row with \code{key = NA} applies to every key, such as one perception
+estimate combined with monthly availability. Otherwise each component must
+have exactly one row for each key in the full set of keys.
 
-Components keyed on \strong{different things} are refused rather than joined.
-Availability by month and perception by year is the common case, and it has
-no correct join: the answer is a value per month-year, which means building
-the cross product yourself and keying on it. Silently pairing January with
-1998 because both are first in their vectors is exactly the failure this
-refuses to commit.
+Components keyed on different things are refused, not joined. Availability
+by month and perception by year have no correct join: the answer needs one
+value per month-year, so build that cross product and key both components
+on it. Also refused: several rows with no keys, a mix of keyed and unkeyed
+rows, and duplicate keys within a component.
 }
 
 \section{Recording where a component came from}{
 
-Components may carry an optional \code{source} column, and it is worth using.
+A component may carry a \code{source} column, which is kept in the object and
+printed. A component without one is printed as \verb{source not recorded}.
 
-Perception is the reason. Estimating it needs two independent observer teams,
-and whether a survey programme ran them is a property of that programme
-rather than of the archive its data ends up in. A NARWC extract may or may
-not carry the structure, so for many datasets the only available perception
-estimate is one \strong{borrowed from a different programme}. Roberts et al.
-(2024) did exactly this — perception was estimable only from NOAA's AMAPPS
-surveys, and they applied those corrections to the other ten institutions'
-data, cautioning in print that it could have biased their density estimates.
-
-A borrowed correction that looks local is the failure this guards against. So
-\code{source} travels with the component into the object and is printed every
-time, and a component with none is shown as \verb{source not recorded} rather than
-silently blank.
+This matters most for perception. Estimating it needs two independent
+observer teams, and whether a programme ran them varies by programme, not
+by the archive (such as NARWC) that holds its data. Perception is often
+borrowed from another programme. Roberts et al. (2024) estimated it only
+from NOAA's AMAPPS surveys, applied it to data from ten other
+institutions, and noted this could bias their density estimates. Recording
+the source keeps a borrowed correction from looking local.
 }
 
 \examples{
@@ -108,7 +115,7 @@ avail <- availability(surface = 60, dive = 240, window = 24,
                       se_surface = 8, se_dive = 25)
 avail$source <- "focal follows, this survey"
 
-# A perception estimate that is not this survey's, said so
+# A perception estimate borrowed from another programme, recorded as such
 perception <- data.frame(
   key = NA_character_, component = "perception", value = 0.68, se = 0.09,
   source = "AMAPPS double-observer, borrowed - not measured on this survey"
@@ -116,7 +123,7 @@ perception <- data.frame(
 
 g0(avail, perception)
 
-# Without perception at all, which is said too
+# Without perception: a warning, and "assumed 1" in the printout
 suppressWarnings(g0(avail))
 
 }
@@ -124,8 +131,14 @@ suppressWarnings(g0(avail))
 Laake, J.L. and Borchers, D.L. (2004) Methods for incomplete detection at
 distance zero. In \emph{Advanced Distance Sampling}, pp. 108-189. Oxford
 University Press. Why the components are separate quantities.
+
+Roberts, J.J., Yack, T.M., Fujioka, E., Halpin, P.N., Baumgartner, M.F. and
+others (2024) North Atlantic right whale density surface model for the US
+Atlantic evaluated with passive acoustic monitoring. \emph{Marine Ecology Progress
+Series} 732:167-192. \doi{10.3354/meps14547} Perception borrowed across
+programmes.
 }
 \seealso{
-\code{\link[=availability]{availability()}} for the availability component. \code{\link[=sweep_models]{sweep_models()}}
-for why none of this enters the detection function fit.
+\code{\link[=availability]{availability()}} for the availability component, \code{\link[=sweep_models]{sweep_models()}}
+for the detection function fit, which this does not enter.
 }

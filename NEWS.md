@@ -332,6 +332,24 @@ Two things documented because they would otherwise be discovered the hard way:
   routinely, since `plotEffects()` forwards its own unresolved defaults.
   `match.arg()` rejects those outright, so the choices are resolved by hand.
 
+## Documentation and a numbered pipeline (2026-11-12)
+
+* Five numbered scripts in `inst/scripts/` run a basic analysis end to end:
+  load, check, fit, plot, g(0). `docs/03-running-a-pipeline.md` walks
+  through them, and the README lists them.
+* Help pages rewritten in plainer language, each exported function with a
+  "How it works" list of its steps. Internal functions have header comments
+  and their bodies step comments. The getting-started vignette is a numbered
+  walk-through of the same pipeline.
+* Fixed while documenting: `diagnose_sweep()` warned about missing covariate
+  values on empty samples that are dropped before fitting, and claimed a
+  gradual onset it had too few detections to test. Circling distances beyond
+  the truncation are no longer counted.
+* The adjustment-model regression test compares with a 0.1% tolerance
+  instead of a text snapshot. Fits under the monotonicity constraint differ
+  between platforms in the fourth decimal, which failed CI on Linux and
+  Windows; the other five snapshots are unconstrained and stay exact.
+
 ## Second audit (2026-11-12)
 
 Three independent reviews; full list in `docs/02-code-guide.md`, Section 10.1.
