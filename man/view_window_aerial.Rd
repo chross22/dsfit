@@ -2,69 +2,77 @@
 % Please edit documentation in R/availability.R
 \name{view_window_aerial}
 \alias{view_window_aerial}
-\title{The time an animal stays in view of an aircraft}
+\title{Time in view for an aircraft}
 \usage{
 view_window_aerial(trackline, speed, angle = NULL, slope = NULL, distance = 0)
 }
 \arguments{
-\item{trackline}{Time in view at the trackline, in seconds — \eqn{\alpha}.}
+\item{trackline}{Numeric. Time in view at the trackline, \eqn{\alpha}, in
+seconds. Must not be negative.}
 
-\item{speed}{Ground speed, in metres per second.}
+\item{speed}{Numeric. Ground speed, in metres per second. Must be positive.}
 
-\item{angle}{Viewing half-angle forward and aft, in \strong{degrees} from
-perpendicular. Give this or \code{slope}, not both.}
+\item{angle}{Numeric or \code{NULL} (default). Viewing half-angle \eqn{\theta}, in
+degrees from perpendicular: the view runs \code{angle} forward and \code{angle} aft.
+Must be above 0 and below 90. Give this or \code{slope}, not both.}
 
-\item{slope}{Seconds of view gained per metre of perpendicular distance,
-\eqn{\tan\theta / v}, if it was calibrated directly. Give this or \code{angle}.}
+\item{slope}{Numeric or \code{NULL} (default). Seconds in view gained per metre
+of perpendicular distance, \eqn{2 \tan\theta / v}, if calibrated directly.
+Must not be negative. Give this or \code{angle}, not both.}
 
-\item{distance}{Perpendicular distance, in metres.}
+\item{distance}{Numeric. Perpendicular distance, in metres. Default \code{0}.
+Must not be negative.}
 }
 \value{
-A numeric vector of window durations in seconds.
+A numeric vector of windows in seconds.
 }
 \description{
-The window \code{\link[=availability]{availability()}} needs, for an observer looking through a side
-window of an aircraft: a field of view running forward and aft, rather than a
-circular patch.
+Computes the \code{window} for \code{\link[=availability]{availability()}} for an observer looking through
+the side window of an aircraft. The field of view is a wedge running forward
+and aft of perpendicular, so time in view grows with perpendicular distance.
+This is the usual geometry for an aerial line-transect survey.
 }
-\section{Why this grows with distance}{
+\section{How it works}{
 
-The field of view is an angular wedge. An animal further off the trackline
-sits inside that wedge for \strong{longer}, because the wedge is wider out there.
-This is the opposite of \code{\link[=view_window]{view_window()}}'s circular geometry, and it is the
-case that applies to a line-transect aerial survey.
+Following the linear form fitted by Ganley et al. (2019), for a time in view
+\eqn{\alpha} at the trackline, a viewing half-angle \eqn{\theta} forward of
+perpendicular and the same aft, and ground speed \eqn{v}:
 
-Following Ganley et al. (2019), for a time in view \eqn{\alpha} at the
-trackline, a viewing half-angle \eqn{\theta} forward and aft, and ground
-speed \eqn{v}:
+\deqn{t(x) = \alpha + \frac{2 x \tan\theta}{v}}
 
-\deqn{t(x) = \alpha + \frac{x \tan\theta}{v}}
+A point at perpendicular distance \eqn{x} enters the wedge \eqn{x \tan\theta}
+ahead of abeam and leaves \eqn{x \tan\theta} behind, so it is in view for an
+extra \eqn{2 x \tan\theta} of track.
+\enumerate{
+\item Exactly one of \code{angle} and \code{slope} must be given.
+\item If \code{angle} is given, the slope is computed as
+\eqn{2 \tan\theta / v} seconds per metre.
+\item The window is \code{trackline + distance * slope}.
+}
 }
 
-\section{Calibrating it, rather than deriving it}{
+\section{Calibrating the inputs}{
 
-Ganley et al. (2019) obtained \eqn{\alpha} and \eqn{\theta} by flying
-transects past a navigation buoy and timing it through the field of view,
-which is worth far more than a derivation from window dimensions. For the
-Cessna Skymaster over Cape Cod Bay, at 185 km/h and 228 or 304 m altitude,
-they found time in view at the effective trackline to be \strong{51.22 s}, and a
-slope of about 0.03 s per metre of perpendicular distance. Altitude made no
-detectable difference across the two they flew.
+Measured values are better than derived ones. Ganley et al. (2019) flew past
+a navigation buoy and timed it through the field of view. For a Cessna
+Skymaster at 185 km/h and 228 or 304 m altitude, they found 51.22 s in view
+at the effective trackline and a slope of about 0.03 s per metre. The two
+altitudes did not differ detectably.
 
-Their trackline is at 100 m rather than 0 m, because the aircraft's flat
-windows leave a blind spot directly beneath it — the same blind spot that
-\code{sweep_models(left = )} and the gamma key handle at the fitting end. Their
-surveys were left-truncated at 100 m for exactly that reason.
+Their effective trackline is at 100 m, not 0 m, because the aircraft's flat
+windows leave a blind spot beneath it; their data were left-truncated at
+100 m for that reason. At the fitting end the same blind spot is handled by
+\code{sweep_models(left = )} or the gamma key.
 }
 
 \examples{
 # Ganley et al.'s Skymaster, calibrated directly: 51.22 s at the trackline,
-# gaining about 0.03 s per metre out
+# plus about 0.03 s per metre
 view_window_aerial(trackline = 51.22, speed = 51.4, slope = 0.03,
                    distance = c(0, 1000, 3000))
 
-# The same thing from a viewing half-angle
-view_window_aerial(trackline = 51.22, speed = 51.4, angle = 57,
+# The same from a half-angle: 2 * tan(37.6 deg) / 51.4 is about 0.03 s/m
+view_window_aerial(trackline = 51.22, speed = 51.4, angle = 37.6,
                    distance = c(0, 1000, 3000))
 
 }

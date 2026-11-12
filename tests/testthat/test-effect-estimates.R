@@ -190,3 +190,36 @@ test_that("a hazard-rate covariate model averages its curves without recycling",
   # The arithmetic mean over the animals, as for the half-normal case.
   expect_equal(p_bar, mean(f$fitted), tolerance = 1e-3)
 })
+
+test_that("a uniform-key curve is a curve, not NaN", {
+  set.seed(1)
+  d <- data.frame(object = 1:200, distance = abs(stats::rnorm(200, 0, 150)))
+  d <- d[d$distance < 400, ]
+  f <- mrds::ddf(dsmodel = ~cds(key = "unif", formula = ~1, adj.series = "cos",
+                                adj.order = 1),
+                 data = d, method = "ds", meta.data = list(width = 400))
+  est <- effect_estimates_ddf(f, n = 2000)
+  expect_false(anyNA(est$.estimate))
+  p_bar <- trapz(est$.x, est$.estimate) / diff(range(est$.x))
+  expect_equal(p_bar, summary(f)$average.p, tolerance = 1e-3)
+})
+
+test_that("`at` takes a factor covariate's level by name", {
+  set.seed(1)
+  d <- data.frame(object = 1:300, plat = factor(rep(c("A", "B", "C"), 100)))
+  d$distance <- abs(stats::rnorm(300, 0, c(A = 80, B = 140, C = 200)[d$plat]))
+  d <- d[d$distance < 400, ]
+  f <- mrds::ddf(dsmodel = ~mcds(key = "hn", formula = ~plat), data = d,
+                 method = "ds", meta.data = list(width = 400))
+  by_name <- effect_estimates_ddf(f, at = list(plat = "B"))
+  by_factor <- effect_estimates_ddf(
+    f, at = list(plat = factor("B", levels = c("A", "B", "C"))))
+  expect_equal(by_name, by_factor)
+  expect_error(effect_estimates_ddf(f, at = list(plat = "Z")),
+               "not a level of `plat`")
+})
+
+test_that("the band always contains the estimate", {
+  est <- effect_estimates_ddf(fit_hn())
+  expect_true(all(est$.lower <= est$.estimate & est$.estimate <= est$.upper))
+})

@@ -98,16 +98,19 @@ test_that("binned data sweeps through the binned likelihood", {
 })
 
 test_that("a model that fails to fit is recorded, not fatal", {
+  # A covariate that is not in the data fails inside mrds every time, so the
+  # failure is certain rather than dependent on the optimiser's start.
   sw <- suppressWarnings(sweep_fx(
-    exact_data(n = 12, seed = 3),
-    model_set("hn", adjustment = "cos", order = 8),
+    exact_data(), model_set("hn", formula = list(~1, ~absent)),
     truncation = 400
   ))
   tab <- sw$table
-  expect_equal(nrow(tab), 1)
-  # Whether it converges is data-dependent; what matters is that the sweep
-  # returned a table either way rather than stopping.
-  expect_true(is.logical(tab$converged))
+  expect_equal(nrow(tab), 2)
+  expect_equal(tab$converged[tab$model_id == "hn absent"], FALSE)
+  expect_true(tab$converged[tab$model_id == "hn"])
+  # The reason is recorded under the model's ID, and is not blank.
+  expect_named(sw$settings$failures, "hn absent")
+  expect_true(nzchar(sw$settings$failures[["hn absent"]]))
 })
 
 test_that("a failed fit does not slide the other models onto wrong rows", {
@@ -211,4 +214,41 @@ test_that("esw is p times the searched width when left truncation is set", {
   sw <- sweep_fx(exact_data(), model_set("hn"), truncation = 400, left = 50)
   tab <- selection_table(sw)
   expect_equal(tab$esw, tab$p * (400 - 50))
+})
+
+test_that("adjustment models are fitted monotone, as Distance::ds() fits them", {
+  # Unconstrained, hr+cos(2) put g(x) at 1.09 here, and its AIC and p differed
+  # from ds() with its defaults (3399.27 against 3401.50).
+  set.seed(1)
+  x <- abs(stats::rnorm(900, 0, 150))
+  x <- x[x < 500][1:300]
+  sw <- suppressWarnings(sweep_fx(data.frame(distance = x),
+                                  model_set("hr", adjustment = "cos", order = 2),
+                                  truncation = 400))
+  expect_equal(sw$table$aic, 3401.498, tolerance = 1e-6)
+  expect_true(sw$fits[[1]]$meta.data$mono.strict)
+  est <- effect_estimates_ddf(sw$fits[[1]], n = 501)
+  expect_lte(max(est$.estimate), 1 + 1e-8)
+})
+
+test_that("keys alone, covariate models and gamma are not constrained", {
+  m <- model_set(c("hn", "gamma"), adjustment = "cos", formula = list(~1, ~bf))
+  for (i in seq_len(nrow(m))) {
+    want <- m$key[i] != "gamma" && m$formula[i] == "~1"
+    expect_equal(monotonicity(m[i, ])$mono, want, info = m$model_id[i])
+  }
+  expect_false(monotonicity(model_set("hn")[1, ])$mono)
+})
+
+test_that("a failure reason is the first non-empty line of the error", {
+  expect_equal(first_line("\nSome values of object are duplicates\nmore"),
+               "Some values of object are duplicates")
+  expect_equal(first_line("plain"), "plain")
+})
+
+test_that("models must be a model set", {
+  expect_error(sweep_fx(exact_data(), data.frame(key = "hn"), truncation = 400),
+               "built by `model_set\\(\\)`")
+  expect_error(sweep_fx(exact_data(), model_set()[0, ], truncation = 400),
+               "no candidates")
 })

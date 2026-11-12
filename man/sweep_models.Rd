@@ -14,98 +14,124 @@ sweep_models(
 )
 }
 \arguments{
-\item{data}{A data frame with one row per detection. Needs \code{distance} for
-exact distances, or \code{distbegin} and \code{distend} for binned ones. The flatfile
-from \code{distsamp::detection_data()} is this shape; rows with no detection are
-dropped here.}
+\item{data}{Data frame with one row per detection. Needs a \code{distance}
+column for exact distances, or \code{distbegin} and \code{distend} for binned ones.
+The flatfile from \code{distsamp::detection_data()} has this shape. Rows with
+no distance (samples without a detection) are dropped.}
 
-\item{models}{A \code{\link[=model_set]{model_set()}}, or \code{NULL} for the default set.}
+\item{models}{A \code{\link[=model_set]{model_set()}}. \code{NULL} (default) uses \code{model_set()}.}
 
-\item{truncation}{Right truncation distance. Required: it defines the data
-every model in the sweep is fitted to.}
+\item{truncation}{Number. Right truncation distance, in the units of the
+distances. Required, with no default.}
 
-\item{left}{Left truncation distance, for a platform that cannot see beneath
-itself. \code{NULL} (default) for none.}
+\item{left}{Number. Left truncation distance, for a platform that cannot
+see beneath itself. \code{NULL} (default) for none.}
 
-\item{breaks}{Bin cutpoints, for binned data. Taken from \code{distbegin}/
-\code{distend} when not given.}
+\item{breaks}{Numeric vector of bin cutpoints, for binned data. \code{NULL}
+(default) derives them from \code{distbegin} and \code{distend}. Ignored, with a
+warning, for exact distances.}
 
-\item{quiet}{Suppress the progress and failure report. Default \code{FALSE}.}
+\item{quiet}{Logical. \code{TRUE} suppresses the summary message. Default
+\code{FALSE}.}
 }
 \value{
-An object of class \code{dsfit_sweep}: a list with \code{table} (the selection
-table), \code{fits} (the \code{ddf} objects, named by \code{model_id}), and \code{settings}.
+An object of class \code{dsfit_sweep}, a list with:
+\describe{
+\item{\code{table}}{The selection table, one row per candidate including
+failures. See \code{\link[=selection_table]{selection_table()}} for the columns.}
+\item{\code{fits}}{List of \code{ddf} objects named by \code{model_id}. \code{NULL} for a
+candidate that failed.}
+\item{\code{settings}}{List with \code{truncation}, \code{left}, \code{binned}, \code{breaks}, \code{n}
+(detections fitted), \code{n_dropped} (rows removed during preparation) and
+\code{failures} (first line of the error, or \code{"did not converge"}, named
+by \code{model_id}).}
+}
 }
 \description{
-Fits every candidate in a \code{\link[=model_set]{model_set()}} to the same data, at the same
-truncation, and returns a selection table ranked on more than AIC.
+Fits every candidate in a \code{\link[=model_set]{model_set()}} to the same data at the same
+truncation, using \code{mrds::ddf()}, and returns a selection table. Use it to
+choose a detection function for a survey.
 }
-\section{Why truncation is one argument and not a column}{
+\section{How it works}{
 
-AIC compares models fitted to the same data. Changing the truncation changes
-which detections are in the likelihood, so AICs either side of that are not
-on the same scale and ranking them together is meaningless.
-
-Truncation is therefore a single value for a whole sweep, by construction.
-To compare truncations, run a sweep for each and compare the \emph{sweeps} —
-which is a different question, answered by looking at whether the chosen
-model and its \verb{p̄} are stable, not by reading one AIC column.
+\enumerate{
+\item Checks that \code{mrds} is installed, that \code{models} is a model set, and that
+\code{truncation} is a single positive number.
+\item Prepares the data with \code{\link[=prepare_distance_data]{prepare_distance_data()}}: validates the
+distances, drops rows with no distance or outside the truncation, and
+decides whether the fit is binned.
+\item Warns if \code{left} is set and the model set contains the gamma key.
+\item Fits each candidate with \code{mrds::ddf()}. A candidate that errors or does
+not converge is recorded as a failure and the sweep continues.
+\item Builds the selection table, sorted by AIC, and prints a short report
+unless \code{quiet = TRUE}.
 }
-
-\section{Read \code{p_cv} and \code{esw}, not just \code{delta_aic}}{
-
-What propagates into abundance is the effective strip half-width. Two models
-within 2 AIC of one another can imply materially different values of it, and
-the difference goes straight into density. The table therefore carries \code{p}
-(average detection probability), its standard error and CV, and \code{esw}
-alongside the AIC, and \code{\link[=selection_table]{selection_table()}} sorts on AIC only because
-something has to be first.
-
-A goodness-of-fit statistic is reported too, whose null is that the fitted
-function describes the observed distances. A small p-value is evidence
-against the model, and a model can be top of the AIC ranking and still fail
-it.
-
-Which test to read follows the data rather than a preference. Exact distances
-get Cramér-von Mises (\code{cvm_p}), which tests their empirical distribution
-directly. Binned distances have no such distribution, and get a chi-square
-over the survey's own bins (\code{chisq_p}) — without which a binned sweep would
-carry no goodness-of-fit at all. \code{chisq_p} is filled in for exact fits too,
-but over cutpoints \code{mrds} chooses; a test whose result moves with an
-arbitrary binning is the weaker one, and \code{cvm_p} is what to read there. Both
-columns are named for their test, so a p-value is never read without knowing
-where it came from, and \code{\link[=print]{print()}} shows the one that applies.
-
-A chi-square over few bins runs out of degrees of freedom quickly — three
-bins and a two-parameter key leave none — and \code{mrds} returns \code{NA} rather
-than a p-value when it does. That is a converged model with no goodness-of-fit
-test available, not a failed one.
 }
 
-\section{Binned and exact distances cannot be swept together}{
+\section{Truncation is one value per sweep}{
 
-\code{STRIP}-derived distances are intervals and are fitted binned; angle- and
-position-derived distances are points. The likelihoods differ, so their AICs
-are not comparable, and a table containing both would be a survey-era
-boundary rather than a model set. Data carrying both is refused.
+AIC only compares models fitted to the same data. A different truncation
+keeps a different set of detections, so the AICs are not comparable. To
+compare truncations, run one sweep per truncation and check whether the
+chosen model and its \code{p} stay stable.
 }
 
-\section{Left truncation and the gamma key are alternatives}{
+\section{What the table reports besides AIC}{
 
-Both describe a platform that cannot see beneath itself — an aircraft's flat
-windows, or a hull. Applying \code{left}
-to a model set that contains the gamma key accounts for the blind spot twice,
-and warns.
+The effective strip half-width (esw) is the width of a strip in which
+detection is certain that would yield the same expected number of
+detections. It goes directly into density. Two models within 2 AIC of each
+other can have quite different esw, so the table reports \code{p} (average
+detection probability), its standard error and CV, and \code{esw} next to AIC.
+
+A goodness-of-fit p-value is also reported. The null hypothesis is that the
+fitted function describes the observed distances, so a small p-value is
+evidence against the model. The top AIC model can still fail this test.
 }
 
-\section{This does not estimate g(0)}{
+\section{Which goodness-of-fit test to read}{
 
-Every fit here conditions on the animal having been available and seen. For a
-deep-diving species that assumption biases density low, and no amount of
-model selection detects it — a mis-specified \code{g(0)} shifts every candidate in
-the set by the same factor, so the ranking looks untouched. Correct for it at
-the abundance step, from external sources, with its standard error
-propagated.
+Exact distances get a Cramer-von Mises test (\code{cvm_p}), which tests their
+empirical distribution. Binned distances have no empirical distribution, so
+they get a chi-square test over the survey's own bins (\code{chisq_p}).
+\code{chisq_p} is also filled in for exact distances, but over cutpoints \code{mrds}
+chooses; read \code{cvm_p} there. Printing a sweep shows the test that applies.
+
+A chi-square test over few bins can have no degrees of freedom left (for
+example three bins and a two-parameter key). \code{mrds} then returns \code{NA}. The
+model converged; it just has no chi-square test.
+}
+
+\section{Binned and exact distances cannot be mixed}{
+
+Distances from \code{STRIP} records are intervals and are fitted binned.
+Distances from angles or positions are exact. The two likelihoods differ, so
+their AICs are not comparable. Data containing both is refused; split it and
+run one sweep for each.
+}
+
+\section{Left truncation and the gamma key}{
+
+Both model a platform that cannot see directly beneath itself. Using both
+accounts for the blind spot twice, so setting \code{left} for a model set that
+contains the gamma key gives a warning.
+}
+
+\section{Monotonicity constraint}{
+
+As in \code{Distance::ds()}, a candidate with adjustment terms and no covariates
+is fitted with a strict monotonicity constraint (\verb{mono = TRUE, mono.strict = TRUE} in \code{mrds}). This stops g(x), the detection probability
+at distance x, from exceeding 1 or turning upward. AIC and \code{p} then match
+\code{ds()} with its defaults. Covariate models are unconstrained, as in \code{ds()}.
+The gamma key is also unconstrained, because it rises to a peak by design.
+}
+
+\section{g(0) is assumed to be 1}{
+
+Every fit assumes an animal on the track-line is always detected. A wrong
+g(0) scales every candidate by the same factor, so model selection cannot
+detect it. Correct for it at the abundance step, from external sources, and
+propagate its standard error (see \code{\link[=g0]{g0()}}).
 }
 
 \examples{
@@ -117,7 +143,7 @@ d <- d[d$distance < 400, ]
 sw <- sweep_models(d, model_set(c("hn", "hr", "gamma")), truncation = 400)
 sw
 
-# AIC alone would not have told you this
+# Compare esw and p_cv as well as delta AIC
 selection_table(sw)[, c("model_id", "delta_aic", "p", "p_cv", "esw")]
 \dontshow{\}) # examplesIf}
 }

@@ -2,23 +2,38 @@
 % Please edit documentation in R/sweep.R
 \name{selection_table}
 \alias{selection_table}
-\title{The ranked selection table from a sweep}
+\title{Get the selection table from a sweep}
 \usage{
 selection_table(x, converged_only = TRUE)
 }
 \arguments{
-\item{x}{A \code{dsfit_sweep} from \code{\link[=sweep_models]{sweep_models()}}.}
+\item{x}{A \code{dsfit_sweep} object from \code{\link[=sweep_models]{sweep_models()}}.}
 
-\item{converged_only}{Drop models that failed to fit. Default \code{TRUE}.}
+\item{converged_only}{Logical. \code{TRUE} (default) drops candidates that
+failed to fit or did not converge.}
 }
 \value{
-A tibble, sorted by AIC, with \code{model_id}, \code{key}, \code{adjustment},
-\code{order}, \code{formula}, \code{converged}, \code{n_par}, \code{aic}, \code{delta_aic}, \code{p}, \code{p_se},
-\code{p_cv}, \code{esw}, and a goodness-of-fit p-value in \code{cvm_p} (exact distances)
-or \code{chisq_p} (binned).
+A tibble with one row per candidate and columns:
+\describe{
+\item{\code{model_id}, \code{key}, \code{adjustment}, \code{order}, \code{formula}}{The candidate,
+as in \code{\link[=model_set]{model_set()}}.}
+\item{\code{converged}}{\code{TRUE} if the fit succeeded.}
+\item{\code{n_par}}{Number of estimated parameters.}
+\item{\code{aic}, \code{delta_aic}}{AIC, and its difference from the lowest AIC.}
+\item{\code{p}, \code{p_se}, \code{p_cv}}{Average detection probability over the
+searched strip, its standard error, and its coefficient of variation.}
+\item{\code{esw}}{Effective strip half-width: \code{p} times the width of the
+searched strip (\code{truncation} minus \code{left}).}
+\item{\code{cvm_p}}{Cramer-von Mises goodness-of-fit p-value. \code{NA} for binned
+distances.}
+\item{\code{chisq_p}}{Chi-square goodness-of-fit p-value. The test to read for
+binned distances.}
+}
+Columns describing a fit are \code{NA} for a candidate that failed.
 }
 \description{
-The ranked selection table from a sweep
+Returns the table of fitted candidates from a \code{\link[=sweep_models]{sweep_models()}} result,
+sorted by AIC (lowest first).
 }
 \examples{
 \dontshow{if (requireNamespace("mrds", quietly = TRUE)) withAutoprint(\{ # examplesIf}

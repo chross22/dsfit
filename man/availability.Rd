@@ -2,7 +2,7 @@
 % Please edit documentation in R/availability.R
 \name{availability}
 \alias{availability}
-\title{Availability: the probability an animal was at the surface to be seen}
+\title{Availability of an animal at the surface}
 \usage{
 availability(
   surface,
@@ -15,115 +15,109 @@ availability(
 )
 }
 \arguments{
-\item{surface}{Mean surfacing interval, in seconds. A vector gives one result
-per element, which is how a per-month table is built.}
+\item{surface}{Numeric. Mean surfacing interval, in seconds. Must be
+positive. A vector gives one result per element.}
 
-\item{dive}{Mean diving interval, in seconds. Recycled against \code{surface}.}
+\item{dive}{Numeric. Mean diving interval, in seconds. Must be positive.
+Length 1 or the length of the longest input.}
 
-\item{window}{Time the animal is within view, in seconds. See \code{\link[=view_window]{view_window()}}
-to derive it from platform geometry. Recycled against \code{surface}.}
+\item{window}{Numeric. Time the animal is in view, in seconds. Must not be
+negative. Derive it with \code{\link[=view_window_aerial]{view_window_aerial()}}, \code{\link[=view_window_vessel]{view_window_vessel()}} or
+\code{\link[=view_window]{view_window()}}. Length 1 or the length of the longest input.}
 
-\item{se_surface, se_dive}{Standard errors of \code{surface} and \code{dive}. Both are
-needed for a standard error on the result; either alone is an error, since
-propagating one source of variance and silently dropping the other
-understates the total.}
+\item{se_surface, se_dive}{Numeric or \code{NULL} (default). Standard errors of
+\code{surface} and \code{dive}, in seconds. Give both or neither: propagating one
+and dropping the other would understate the total variance.}
 
-\item{cov_surface_dive}{Covariance between the two interval means. Zero by
-default, which is right when they are estimated from separate follows and
-optimistic when they are not.}
+\item{cov_surface_dive}{Numeric. Covariance between the two interval means,
+in seconds squared. Default \code{0}, which is right when they come from
+separate follows and optimistic otherwise. Used only with standard errors.}
 
-\item{key}{Optional labels — months, platforms, years — carried through to the
-result so the rows stay attached to what they apply to.}
+\item{key}{Optional vector of labels (months, platforms, years), one per
+result. Must have the same length as the result. Stored as character.}
 }
 \value{
-A tibble with one row per element of \code{surface}: \code{key}, \code{component}
-(always \code{"availability"}), \code{value}, and \code{se}. That is the shape a \code{g(0)}
-correction is assembled from, so availability and perception rows stack.
+A tibble with one row per element of the longest input, and columns:
+\describe{
+\item{key}{The label from \code{key}, or \code{NA}.}
+\item{component}{Always \code{"availability"}.}
+\item{value}{Availability, between 0 and 1.}
+\item{se}{Standard error of \code{value}, or \code{NA} without \code{se_surface} and
+\code{se_dive}.}
+}
+This is the component shape \code{\link[=g0]{g0()}} accepts, so availability and perception
+rows can be stacked.
 }
 \description{
-Computes the probability that an animal was available to be detected while it
-was within view, from its surfacing and diving intervals and the time the
-survey platform kept it in view. This is the availability component of
-\code{g(0)}, and it is \strong{computed from external dive data, not estimated from the
-survey}.
+Computes availability: the probability that an animal is at the surface,
+and so can be seen, while it is within the observers' view. Use it to build
+the availability component of a \code{g(0)} correction, one row per key (month,
+platform, year), and pass the result to \code{\link[=g0]{g0()}}.
 }
-\section{Why this is a calculation and not an estimator}{
+\section{Why availability is computed, not estimated}{
 
-An animal submerged while the aircraft passes is missed at every
-perpendicular distance equally. To first order availability is a pure scale
-factor on \eqn{g(x)}: it does not dent the near-zero end of the distance
-distribution, does not change its shape, and leaves no signature for a
-likelihood to find. That is exactly why a mis-specified \code{g(0)} shifts every
-candidate in a \code{\link[=selection_table]{selection_table()}} by the same factor and leaves the ranking
-looking untouched.
-
-So there is nothing in the distances to estimate it from, and none of the
-inputs here come from the survey being corrected. \code{surface} and \code{dive} come
-from focal follows, tagging, or drone observation; \code{window} comes from the
-platform's geometry and speed. Both arrive with their own uncertainty, which
-is the point: it is visible rather than absorbed into a constant.
+An animal that is submerged while the platform passes is missed at every
+perpendicular distance equally. Availability therefore scales the detection
+function \eqn{g(x)} without changing its shape, and the distances carry no
+information about it. The inputs come from outside the survey: \code{surface}
+and \code{dive} from focal follows, tags or drones, and \code{window} from the
+platform's geometry and speed.
 }
 
-\section{The formula}{
+\section{How it works}{
 
 Following Laake et al. (1997), for a mean surfacing interval \eqn{E(s)}, a
-mean diving interval \eqn{E(d)}, and a window \eqn{w} during which the animal
-is in view:
+mean diving interval \eqn{E(d)}, and a window \eqn{w} (the time the animal
+is in view):
 
 \deqn{a = \frac{E(s) + E(d)\left(1 - e^{-w/E(d)}\right)}{E(s) + E(d)}}
 
-The two limits are worth holding onto as a check on any number this returns.
-As \eqn{w \to 0} the window is instantaneous and \eqn{a} becomes
-\eqn{E(s)/(E(s) + E(d))}, the plain proportion of time spent at the surface.
-As \eqn{w \to \infty} the platform watches forever, every animal surfaces
-eventually, and \eqn{a \to 1}. The middle term is the extra chance that an
-animal which was down when the window opened comes up before it closes.
+At \eqn{w = 0}, \eqn{a} is \eqn{E(s)/(E(s) + E(d))}, the proportion of time
+at the surface. As \eqn{w} grows, \eqn{a} approaches 1. The middle term is
+the chance that an animal that was submerged when the window opened
+surfaces before it closes.
+\enumerate{
+\item The inputs are checked and recycled to a common length. Each must have
+length 1 or the common length.
+\item \code{surface} and \code{dive} must be positive and \code{window} must not be negative.
+\item \code{se_surface} and \code{se_dive} must be given together or not at all.
+\item \eqn{a} is computed for each element.
+\item If standard errors were given, the standard error of \eqn{a} is computed
+by the delta method: the gradient of \eqn{a} with respect to
+\eqn{(E(s), E(d))} is taken numerically and combined with their
+covariance matrix, as in \code{\link[=effect_estimates_ddf]{effect_estimates_ddf()}}.
 }
 
-\section{There is no single availability, and that is the finding}{
-
-Ganley et al. (2019) measured this for right whales in Cape Cod Bay and found
-availability varying by month from \strong{0.27 in January to 0.91 in April},
-tracking the depth of the copepod layer the whales were feeding on. Those
-measurements ship as \link{ganley_availability}.
-
-A plausible-looking single figure is therefore the most dangerous input this
-package accepts. A value near 0.83 is a real number for some month, and wrong
-by a factor of three for others — and because it scales every model equally,
-no amount of model selection reveals it. Compute one per key and pass a
-vector, rather than picking a representative value.
-
-Note that this is availability alone. Perception is a separate component and
-a separate measurement, which Ganley et al. did not make — estimating it
-needs a second observer team. \code{\link[=g0]{g0()}} will say so if you leave it out.
+Without \code{se_surface} and \code{se_dive} the standard error is \code{NA}. The function
+does not invent a precision, because the CV of availability often dominates
+the CV of abundance. If the raw focal follows are available, bootstrapping
+them (as Ganley et al. 2019 did) avoids assuming the interval means are
+jointly normal; the result can be passed as \code{se_surface} and \code{se_dive}, or
+the component rows can be built directly.
 }
 
-\section{How the standard error is obtained}{
+\section{Use one value per key, not one constant}{
 
-Availability is deterministic given \code{surface}, \code{dive} and \code{window}, so the
-uncertainty comes from them. Given \code{se_surface} and \code{se_dive}, the Jacobian is
-taken numerically and combined with their covariance matrix — the same
-delta-method treatment \code{\link[=effect_estimates_ddf]{effect_estimates_ddf()}} uses.
+Availability varies. Ganley et al. (2019) found right whale availability in
+Cape Cod Bay ranging from 0.27 in January to 0.91 in April, following the
+depth of the copepods the whales fed on (see \link{ganley_availability}). A
+single constant suited to one month can be wrong by a factor of three for
+another. Because it scales every candidate model equally, model selection
+cannot detect the error. Compute one value per key and pass a vector.
 
-Where the raw focal follows are in hand, resampling them is better than this:
-Ganley et al. (2019) and others bootstrap the follows and take the standard
-deviation of the resulting availabilities, which does not assume the interval
-means are jointly normal. Do that and pass the result on as \code{se_surface} and
-\code{se_dive}, or bypass this and build the rows directly.
-
-Without \code{se_surface} and \code{se_dive} the standard error is \code{NA}, deliberately:
-this function will not invent a precision for a number whose CV routinely
-dominates the CV of abundance.
+This function gives availability only. Perception (whether an animal at the
+surface and in view is seen) is a separate component and needs a second
+observer team to estimate. \code{\link[=g0]{g0()}} warns if it is missing.
 }
 
 \examples{
-# An instantaneous window is the proportion of time at the surface
+# With a zero window, availability is the proportion of time at the surface
 availability(surface = 60, dive = 240, window = 0)
 
-# A real window lifts it: some animals that were down come up in time
+# A longer window raises it: some submerged animals surface in time
 availability(surface = 60, dive = 240, window = 30)
 
-# One row per month, which is how it is actually used
+# One row per month
 availability(
   surface = c(45, 60, 90),
   dive    = c(300, 240, 150),
@@ -131,7 +125,7 @@ availability(
   key     = c("Feb", "Mar", "Apr")
 )
 
-# With uncertainty on the intervals
+# With standard errors on the intervals
 availability(surface = 60, dive = 240, window = 24,
              se_surface = 8, se_dive = 25)
 
@@ -139,28 +133,27 @@ availability(surface = 60, dive = 240, window = 24,
 \references{
 Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997) Probability
 of detecting harbor porpoise from aerial surveys: estimating g(0). \emph{The
-Journal of Wildlife Management} 61:63-75. \doi{10.2307/3802415} The formula
-implemented here.
+Journal of Wildlife Management} 61:63-75. \doi{10.2307/3802415} Source of
+the formula.
 
 Laake, J.L. and Borchers, D.L. (2004) Methods for incomplete detection at
 distance zero. In \emph{Advanced Distance Sampling}, pp. 108-189. Oxford University
-Press. Why perception needs a second observer team, and availability needs
-something outside the survey entirely.
+Press. Why perception and availability need separate data.
 
 Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there
 is: estimating North Atlantic right whale \emph{Eubalaena glacialis} local
 abundance. \emph{Endangered Species Research} 38:101-113.
-\doi{10.3354/esr00938} Focal follows and aircraft field of view applied to
-right whales, and the monthly variation quoted above.
+\doi{10.3354/esr00938} Focal follows and monthly availability for right
+whales.
 
 Roberts, J.J., Yack, T.M., Fujioka, E., Halpin, P.N., Baumgartner, M.F. and
 others (2024) North Atlantic right whale density surface model for the US
 Atlantic evaluated with passive acoustic monitoring. \emph{Marine Ecology Progress
-Series} 732:167-192. \doi{10.3354/meps14547} Corrects perception and
-availability per platform, team and conditions across 11 institutions, which
-is the scale at which these corrections actually vary.
+Series} 732:167-192. \doi{10.3354/meps14547} Corrections for perception and
+availability by platform, team and conditions.
 }
 \seealso{
-\code{\link[=view_window]{view_window()}} for the window, \code{\link[=sweep_models]{sweep_models()}} for why none of this
-belongs in the detection function fit.
+\code{\link[=view_window_aerial]{view_window_aerial()}}, \code{\link[=view_window_vessel]{view_window_vessel()}} and \code{\link[=view_window]{view_window()}}
+for the window; \code{\link[=g0]{g0()}} for combining components; \code{\link[=sweep_models]{sweep_models()}} for the
+detection function fit, which this does not enter.
 }

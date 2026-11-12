@@ -3,95 +3,93 @@
 \name{view_window_vessel}
 \alias{view_window_vessel}
 \alias{view_window_ship}
-\title{The time an animal stays in view of a vessel}
+\title{Time in view for a vessel}
 \usage{
 view_window_vessel(radius, speed, angle = 90, distance = 0)
 
 view_window_ship(radius, speed, angle = 90, distance = 0)
 }
 \arguments{
-\item{radius}{Effective search radius ahead of the vessel, in metres.}
+\item{radius}{Numeric. Effective search radius ahead of the vessel, in
+metres. Must be positive.}
 
-\item{speed}{Vessel speed over ground, in metres per second.}
+\item{speed}{Numeric. Vessel speed over ground, in metres per second. Must be
+positive.}
 
-\item{angle}{Search half-angle from the bow, in \strong{degrees}. \code{90} (default)
-is a full beam-to-beam forward search; a narrower arc is narrower.}
+\item{angle}{Numeric. Search half-angle from the bow, in degrees. Default
+\code{90}, a full beam-to-beam forward search. Must be above 0 and at most 90.}
 
-\item{distance}{Perpendicular distance, in metres. \code{0} (default) is on the
-trackline, which gives the widest window.}
+\item{distance}{Numeric. Perpendicular distance, in metres. Default \code{0}, the
+trackline, which gives the widest window. Must not be negative.}
 }
 \value{
-A numeric vector of window durations in seconds, \code{0} where the animal
-is never inside the searched sector.
+A numeric vector of windows in seconds, \code{0} where the animal is never
+inside the searched sector. \code{view_window_ship()} is an alias.
 }
 \description{
-The window \code{\link[=availability]{availability()}} needs, for observers searching a forward arc from
-a ship: a sector ahead of the bow, which a point on the water enters when it
-comes inside the search angle and leaves when it draws abeam.
+Computes the \code{window} for \code{\link[=availability]{availability()}} for observers on a ship who
+search a sector ahead of the bow. The window runs from the moment the animal
+crosses the search radius to the moment its bearing passes the edge of the
+search angle (abeam, for a full forward search).
 }
-\section{Why a ship is neither of the other two}{
+\section{Which platform this fits}{
 
-\code{\link[=view_window]{view_window()}} is a circular patch, watched fore and aft alike, so its
-window is the full chord. \code{\link[=view_window_aerial]{view_window_aerial()}} is a wedge through a side
-window, so its window \emph{grows} with perpendicular distance. A shipboard
-observer does neither: the search is \strong{forward only}. Behind the beam there
-is nothing to see that has not already been counted, and a survey that
-counted it would be counting the same animal twice.
+A ship's observers search forward only. An animal behind the beam has
+already been passed, and counting it would count it twice. This differs
+from \code{\link[=view_window]{view_window()}}, which watches a full circle, and from
+\code{\link[=view_window_aerial]{view_window_aerial()}}, whose window grows with perpendicular distance.
+}
 
-So the window runs from the moment the animal enters the searched sector to
-the moment it draws abeam, and no further. For a search radius \eqn{r}, a
-search half-angle \eqn{\theta} measured from the bow, a speed \eqn{v} and a
-perpendicular distance \eqn{x}:
+\section{How it works}{
+
+For a search radius \eqn{r}, a search half-angle \eqn{\theta} measured from
+the bow, speed \eqn{v} and perpendicular distance \eqn{x}:
 
 \deqn{w(x) = \frac{\sqrt{r^2 - x^2} - x/\tan\theta}{v}}
-
-The first term is where the animal crosses the radius; the second is where it
-crosses the edge of the search angle. Whichever it meets later is where the
-window opens, so the window is zero when the second exceeds the first — an
-animal too far off the bow to be searched before it passes.
-
-At \code{angle = 90} the sector is the full forward half-disc, \eqn{x/\tan\theta}
-is zero, and the window is exactly \strong{half} \code{\link[=view_window]{view_window()}}'s: same chord,
-half of it aft of the beam and never searched.
+\enumerate{
+\item The animal crosses the search radius when it is \eqn{\sqrt{r^2 - x^2}}
+ahead of the vessel (zero if \eqn{x > r}).
+\item Its bearing passes the edge of the search angle when it is
+\eqn{x/\tan\theta} ahead. At \code{angle = 90} this is set to exactly zero
+(abeam).
+\item The window is the track between the two, divided by speed, and \code{0} when
+the second point is further ahead than the first.
 }
 
-\section{Calibrating it, rather than deriving it}{
+At \code{angle = 90} the window is exactly half of \code{\link[=view_window]{view_window()}}'s: the same
+chord, with the aft half never searched.
+}
 
-The same caution applies as for an aircraft. \code{radius} is an \emph{effective}
-search radius — how far the observers were actually detecting, not how far
-the big-eyes reach — and it is worth measuring rather than assuming. A
-truncation distance from the fitted detection function is a better starting
-point than a nominal one.
+\section{Calibrating the inputs}{
 
-Nothing here corrects for a ship's own effect on the animals. Vessel
-avoidance and attraction both move animals before they are counted, and
-neither is an availability problem: availability asks whether an animal that
-was there surfaced in time to be seen. See \code{\link[=g0]{g0()}} for where the components
-combine.
+\code{radius} is the effective search radius, the distance at which observers
+actually detected animals, not the reach of the binoculars. A truncation
+distance from the fitted detection function is a better starting point than
+a nominal one. This window does not correct for animals moving toward or
+away from the ship before detection; that is not an availability problem.
+See \code{\link[=g0]{g0()}} for how components combine.
 }
 
 \examples{
 # A 6 km effective search radius at 10 knots (5.1 m/s), on the trackline
 view_window_vessel(radius = 6000, speed = 5.1)
 
-# The window closes as the animal approaches the edge of the sector
+# The window shrinks with perpendicular distance and is 0 beyond the radius
 view_window_vessel(radius = 6000, speed = 5.1,
                    distance = c(0, 2000, 5000, 7000))
 
-# A narrower search arc loses the animals furthest off the bow first
+# A narrower search arc shortens the window more at larger distances
 view_window_vessel(radius = 6000, speed = 5.1, angle = 45,
                    distance = c(0, 2000, 5000))
 
-# A full forward search is half a circular patch: the aft half is never
-# searched
+# A full forward search gives half the circular window
 view_window_vessel(radius = 300, speed = 50) == view_window(300, 50) / 2
 
 }
 \references{
 Buckland, S.T., Anderson, D.R., Burnham, K.P., Laake, J.L., Borchers, D.L.
 and Thomas, L. (2001) \emph{Introduction to Distance Sampling.} Oxford University
-Press. Shipboard line transect search geometry, and why the search is
-forward of the beam.
+Press. Shipboard search geometry, forward of the beam.
 
 Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997) Probability
 of detecting harbor porpoise from aerial surveys: estimating g(0). \emph{The
@@ -100,6 +98,5 @@ availability formula this window feeds.
 }
 \seealso{
 \code{\link[=availability]{availability()}} for what the window feeds, \code{\link[=view_window_aerial]{view_window_aerial()}}
-for an aircraft's forward-and-aft wedge, and \code{\link[=view_window]{view_window()}} for a
-circular patch.
+for an aircraft, and \code{\link[=view_window]{view_window()}} for a circular area.
 }

@@ -2,52 +2,129 @@
 % Please edit documentation in R/structure.R
 \name{detection_structure}
 \alias{detection_structure}
-\title{What a set of detections can and cannot support}
+\title{Report which analyses a detection table supports}
 \usage{
 detection_structure(data)
 }
 \arguments{
-\item{data}{A data frame with one row per detection, as \code{\link[=sweep_models]{sweep_models()}}
-takes: \code{distance} for exact distances, or \code{distbegin} and \code{distend} for
-binned ones.}
+\item{data}{Data frame, one row per detection, in the form
+\code{\link[=sweep_models]{sweep_models()}} takes: \code{distance} for exact distances, or \code{distbegin}
+and \code{distend} for binned ones.}
 }
 \value{
-An object of class \code{dsfit_structure}: a list with \code{table} (one row
-per question, with \code{check}, \code{supported} and \code{detail}) and \code{summary} (the
-counts and distance type behind it). \code{supported} is \code{TRUE}, \code{FALSE}, or
-\code{NA} where the structure is present but incomplete.
+An object of class \code{dsfit_structure}, a list with:
+\describe{
+\item{\code{table}}{A tibble with one row per check and columns \code{check}
+(the question), \code{supported} (\code{TRUE}, \code{FALSE}, or \code{NA} where the
+structure is ambiguous or incomplete) and \code{detail} (the reason).}
+\item{\code{summary}}{A list: \code{n} (rows), \code{n_distances} (non-missing
+distances), \code{type} (\code{"exact"}, \code{"binned"}, \code{"both"} or \code{"none"}),
+\code{covariates} (candidate covariate names), \code{duplicates} (named list of
+column-name pairs naming one variable) and \code{nearest} (smallest
+distance, or smallest \code{distbegin} for binned data; \code{NA} if none).}
+}
 }
 \description{
-Reads a table of detections and reports which analyses it admits, and which
-it does not, with the reason. Nothing is fitted and nothing is estimated.
+Reads a table of detections and reports which analyses its structure
+allows, and the reason for each answer. Nothing is fitted or estimated. Use
+it on a new dataset to see what can be done with it before choosing models.
 }
-\section{Why this exists}{
+\section{How it works}{
 
-Most of what decides whether an analysis is possible is structural, and none
-of it is announced by the data. Whether distances are exact or binned decides
-which goodness-of-fit test can be computed. Whether a survey ran two
-independent observer teams decides whether perception bias is estimable at
-all — and that is a property of the survey programme, not of the archive its
-data ends up in, so a pooled extract may or may not carry it.
+\enumerate{
+\item Classify the distances as \code{"exact"} (a non-missing \code{distance}),
+\code{"binned"} (a non-missing \code{distbegin}, with \code{distend} present), \code{"both"}
+or \code{"none"}.
+\item Answer seven questions, one row each (table below).
+\item Find columns that name the same variable twice (see below).
+\item Record the nearest detection distance, where a blind spot beneath the
+platform would show.
+}
 
-The failure this guards against is not an error but a silence: fitting a
-single-observer dataset and reporting the result as though perception had
-been handled. That produces a number, and the number is wrong by a factor.
-Asking here turns "you had to know that" into something the package says.
+The seven checks, in the order they appear in \code{table}:\tabular{ll}{
+   Check \tab Supported when \cr
+   fit a detection function \tab Exact or binned distances. \code{NA} if both are present. The detail compares the count with the 40 workable and 60-80 suggested detections (Buckland et al. 2001). \cr
+   test fit with Cramer-von Mises \tab Exact distances only. Binned data have no empirical distribution to test. \cr
+   test fit with chi-square \tab Exact or binned distances. For binned data it uses the survey's bins; for exact data, cutpoints \code{mrds} chooses. \cr
+   fit covariate models \tab At least one candidate covariate column (see below). \cr
+   estimate perception bias \tab A double-observer structure (see below). \cr
+   estimate availability \tab Never (see below). \cr
+   carry group size to abundance \tab A \code{size} column. \cr
+}
+}
+
+\section{Why structure matters}{
+
+Whether an analysis is possible depends on the survey design, and the data
+do not announce it. Exact or binned distances decide which goodness-of-fit
+test can be computed. Two independent observer teams are needed to
+estimate \emph{perception bias} (animals at the surface but missed by the
+observers). That depends on the survey programme, so a pooled extract may
+or may not carry it.
+
+The risk is silent: a single-observer dataset fits without error, and a
+result reported as if perception had been handled is wrong by a factor.
+This function states that limit explicitly.
+}
+
+\section{Candidate covariates}{
+
+A column is a candidate covariate if all of the following hold:
+\itemize{
+\item It is not a structural column: \code{object}, \code{distance}, \code{distbegin},
+\code{distend}, \code{observer}, \code{detected}, \code{size}, \code{Region.Label}, \code{Area},
+\code{Sample.Label}, \code{Effort}, \code{detected_by}, \code{sample}, \code{distance_source}, or
+a per-sighting NARWC column (identifiers, positions, dates, raw angle and
+strip fields). Names are matched without regard to case, after
+resolving NARWC aliases.
+\item It is not a superseded \verb{<NAME>_ORIGINAL} column whose stem is a known
+variable. \code{narwcr::read_narwc(prefer_source = TRUE)} keeps a replaced
+column under that name for traceability.
+\item It is numeric, character, factor or logical, and has more than one
+distinct non-missing value.
+}
+
+Candidates that NARWC records once per survey leg (sea state, visibility,
+glare, altitude, platform) are listed as survey conditions. The NARWC
+vocabulary comes from the \code{narwcr} package when it is installed. Without
+it, only the structural names above are used.
+}
+
+\section{Duplicate columns}{
+
+Two columns that name one variable, after case-folding and alias
+resolution, are reported in \code{summary$duplicates}. An example is a
+MEMDR-era NARWC file with both \code{LEGTYPE} and \code{LEGTYPE_BK}. The pair is
+ambiguous: nothing here can tell which one a fit should use.
+\code{narwcr::read_narwc(prefer_source = TRUE)} resolves it.
+}
+
+\section{Perception bias}{
+
+Mark-recapture distance sampling (\code{mrds} methods \code{"io"} and \code{"trial"})
+needs one row per observer per object, with an \code{observer} column and a
+\code{detected} column (the detection indicator). Column values are not
+checked. The check gives:
+\itemize{
+\item \code{FALSE} if neither \code{observer} nor \code{detected} is present, or \code{observer}
+has fewer than two values.
+\item \code{NA} if only one of the two columns is present, or if \code{object} is present
+but no value repeats (no animal recorded by both teams).
+\item \code{TRUE} otherwise. Without an \code{object} column, repeats are not checked.
+}
 }
 
 \section{What it does not tell you}{
 
-That an analysis is \emph{supported} is a statement about structure, not about
-whether it is a good idea. Enough detections to fit a detection function is
-not enough detections to fit one well, and a covariate being present is not a
-reason to put it in a model.
+"Supported" is a statement about structure only. Enough detections to fit a
+detection function is not enough to fit one well. A covariate being present
+is not a reason to put it in a model.
 
-Availability is reported as unsupported for every table, which is not a
-defect in any particular dataset: it cannot be estimated from sighting
-distances by construction, because an animal submerged for the whole pass is
-missed at every distance equally and leaves no signature. It is computed from
-dive data instead — see \code{\link[=availability]{availability()}}.
+Availability is unsupported for every table. \emph{Availability} is the
+probability that an animal is at the surface and can be seen. An animal
+submerged for the whole pass is missed at every distance equally, so
+distances carry no information about it. It is computed from dive data
+with \code{\link[=availability]{availability()}}.
 }
 
 \examples{
@@ -64,6 +141,11 @@ b <- data.frame(object = 1:60, distbegin = rep(c(0, 100, 200), 20),
                 distend = rep(c(100, 200, 300), 20))
 detection_structure(b)
 
+}
+\references{
+Buckland, S.T., Anderson, D.R., Burnham, K.P., Laake, J.L., Borchers, D.L.
+and Thomas, L. (2001) \emph{Introduction to Distance Sampling.} Oxford University
+Press. Source of the 40 and 60-80 detection guidelines.
 }
 \seealso{
 \code{\link[=prepare_distance_data]{prepare_distance_data()}}, which enforces what this only reports.

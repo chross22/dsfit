@@ -60,7 +60,7 @@ test_that("a truncation that throws away most of the survey is flagged", {
   # Legal, and rarely intended - usually a units mismatch.
   out <- report(survey(300, sd = 2000), model_set("hn"), truncation = 300)
   expect_match(out, "WARN")
-  expect_match(out, "% of the rows")
+  expect_match(out, "% of the detections")
   expect_match(out, "units")
 })
 
@@ -184,7 +184,8 @@ test_that("an ordinary smallest distance is not mistaken for a blind spot", {
   # every survey ever flown. Only an empty strip wide against the truncation
   # counts.
   ordinary <- report(survey(300), model_set(c("hn", "hr")), truncation = 3000)
-  expect_no_match(ordinary, "reproduces a cliff")
+  expect_no_match(ordinary, "no detections inside")
+  expect_no_match(ordinary, "no key function reproduces")
 })
 
 test_that("the assumption no check can make for you is stated", {
@@ -215,4 +216,39 @@ test_that("break-off distances stop the run at the guards", {
   out <- report(d, model_set("hn"), truncation = 3000)
   expect_match(out, "FAIL  1 distance\\(s\\) have `distance_source == \"break_off\"`")
   expect_match(out, "would not reach `mrds`")
+})
+
+test_that("empty samples are not counted as truncation loss", {
+  # 300 detections, none beyond the truncation, plus 400 flatfile rows for
+  # samples with no detection. Nothing was lost to truncation.
+  d <- survey(300, sd = 100)
+  d <- rbind(d, data.frame(object = 301:700, distance = NA))
+  out <- report(d, model_set("hn"), truncation = 3000)
+  expect_no_match(out, "truncation drops")
+})
+
+test_that("a non-model-set `models` stops the run with a reason", {
+  out <- report(survey(), "hn", truncation = 3000)
+  expect_match(out, "FAIL  could not build the model set")
+})
+
+test_that("zero rows is a failure, not an ok", {
+  out <- report(survey()[0, ], model_set("hn"), truncation = 3000)
+  expect_match(out, "FAIL  0 rows")
+})
+
+test_that("covariate checks use the rows that will be fitted", {
+  # Empty samples carry NA covariates, but they are dropped before fitting.
+  d <- survey(300, sd = 100, beaufort = rep(0:4, 60))
+  d <- rbind(d, data.frame(object = 301:320, distance = NA, beaufort = NA))
+  out <- report(d, model_set("hn", formula = ~beaufort), truncation = 3000)
+  expect_no_match(out, "missing values")
+})
+
+test_that("too few detections to classify the onset is a note, not an ok", {
+  # 30 detections with a 500 m empty strip, and gamma in the set.
+  d <- survey(30, blind = 500, sd = 800)
+  out <- report(d, model_set(c("hn", "gamma")), truncation = 3000)
+  expect_match(out, "note  no detections inside")
+  expect_no_match(out, "rise into the empty strip to")
 })

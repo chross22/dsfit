@@ -3,7 +3,7 @@
 \name{effect_estimates.ddf}
 \alias{effect_estimates.ddf}
 \alias{effect_estimates_ddf}
-\title{Extract a fitted detection function as a tidy frame}
+\title{Extract a fitted detection function as a plottable data frame}
 \usage{
 \method{effect_estimates}{ddf}(
   model,
@@ -30,100 +30,108 @@ effect_estimates_ddf(
 \arguments{
 \item{model}{A fitted \code{ddf} object, from \code{mrds::ddf()} or \code{\link[=sweep_models]{sweep_models()}}.}
 
-\item{var}{Must be \code{"distance"}. A detection function has one predictor;
-plotting detectability against a covariate is a different quantity and is
-not built yet.}
+\item{var}{Must be \code{"distance"}. Plotting detectability against a covariate
+is not supported.}
 
-\item{scale}{Accepted for compatibility with the generic, and ignored. A
-detection function has no separable linear predictor, so every setting
-gives \eqn{g(x)} on the probability scale.}
+\item{scale}{Accepted for compatibility with the generic and ignored. The
+result is always on the probability scale.}
 
-\item{interval}{\code{"se"} for a one-standard-error ribbon, \code{"ci"} for a
-confidence interval at \code{level}, or \code{"auto"} (which \code{fancyfx} forwards by
-default) for \code{"se"}. \code{"cri"} is refused: there is no posterior here to
-summarise.}
+\item{interval}{\code{"se"} for plus and minus one standard error, \code{"ci"} for a
+confidence interval at \code{level}, or \code{"auto"} (the default) for \code{"se"}.
+\code{"cri"} is an error, because there is no posterior.}
 
-\item{level}{Confidence level, used when \code{interval = "ci"}.}
+\item{level}{Confidence level, used only when \code{interval = "ci"}.}
 
-\item{n}{Number of distances at which to evaluate the function.}
+\item{n}{Number of distances at which to evaluate \eqn{g(x)}.}
 
-\item{at}{Named list fixing covariate values, or \code{NULL} (default) to average
-over the covariates as observed.}
+\item{at}{Named list of covariate values to fix, or \code{NULL} (default) to
+average over the observed covariate values.}
 
 \item{...}{Ignored.}
 }
 \value{
-A data frame with \code{.x}, \code{.estimate}, \code{.lower}, \code{.upper}, and a
-\code{"quantity"} attribute, as \code{\link[fancyfx:effect_estimates]{fancyfx::effect_estimates()}} specifies.
+A data frame with one row per grid distance and columns \code{.x}
+(distance), \code{.estimate} (\eqn{g(x)}), \code{.lower} and \code{.upper} (interval
+bounds). Its \code{"quantity"} attribute is \code{"Detection probability g(x)"},
+which \code{fancyfx} uses as the axis label. This is the format
+\code{\link[fancyfx:effect_estimates]{fancyfx::effect_estimates()}} specifies.
 }
 \description{
-An \code{\link[fancyfx:effect_estimates]{fancyfx::effect_estimates()}} method for \code{mrds} detection functions, so
-that a fitted \code{ddf} can be plotted with \code{\link[fancyfx:plotEffects]{fancyfx::plotEffects()}} and
-\code{\link[fancyfx:plotRugs]{fancyfx::plotRugs()}} like any other model.
+Evaluates a fitted \code{mrds} detection function \eqn{g(x)} on a grid of
+distances, with a delta-method interval, and returns it in the format that
+\code{\link[fancyfx:plotEffects]{fancyfx::plotEffects()}} and \code{\link[fancyfx:plotRugs]{fancyfx::plotRugs()}} draw. The detection
+function \eqn{g(x)} is the probability that an animal at perpendicular
+distance \eqn{x} from the trackline is detected.
 }
-\section{Why this method has to exist}{
+\section{How it works}{
 
-\code{fancyfx} sends anything that is not a GAM to \code{marginaleffects}, which cannot
-introspect a \code{ddf} — it reports no predictors at all. The generic is designed
-to be extended from outside the package, and this is that extension. Nothing
-downstream needs to change: the transforms, the ribbon, the rug, and the
-panel arranging all work off the frame returned here.
+\enumerate{
+\item \code{interval} and \code{scale} are checked. \code{"auto"} becomes \code{"se"}, and
+\code{"cri"} is refused.
+\item \code{var} is checked: only \code{"distance"} is accepted.
+\item A grid of \code{n} distances is built from the left truncation distance (0 if
+none) to the right truncation width.
+\item If \code{at} is given, the named covariates are set to those values.
+\item \eqn{g(x)} is evaluated at every grid distance for every observed
+covariate combination, and the curves are averaged.
+\item The standard error at each distance is computed by the delta method
+from the fitted parameters and their inverse Hessian.
+\item The lower and upper bounds are the estimate minus and plus one standard
+error (\code{"se"}) or a normal quantile times it (\code{"ci"}), clamped to
+\verb{[0, 1]}.
+}
 }
 
-\section{What it returns, and what it does not}{
+\section{What the curve is}{
 
-The detection function \eqn{g(x)}: the probability that an animal at
-perpendicular distance \eqn{x} was detected, given that it was available to
-be. It is \strong{not} the probability that an animal at that distance was there
-and seen, and no \code{g(0)} correction is applied — see \code{\link[=sweep_models]{sweep_models()}}.
-
-A rug of the observed distances beneath this curve is the standard
-detection-function diagnostic, which is \code{fancyfx}'s premise applied almost
-exactly.
+The curve is \eqn{g(x)} conditional on the animal being available to be
+seen. No \code{g(0)} correction is applied; see \code{\link[=sweep_models]{sweep_models()}} and \code{\link[=g0]{g0()}}.
+Plotting it over a rug of the observed distances is the standard check of a
+detection function's fit.
 }
 
 \section{Covariate models}{
- the curve is averaged, not evaluated at a mean:
-With detection covariates there is one \eqn{g(x)} per covariate combination.
-This averages those curves over the covariate values actually observed,
-rather than evaluating the function once at mean covariates. The two are
-different, and averaging the curves is the one that has a meaning: it is the
-mean detection function of the animals in the sample.
 
-\code{at} fixes named covariates at chosen values; anything not named is still
-averaged over as observed. \code{at = NULL} averages over everything.
+A model with detection covariates has one \eqn{g(x)} per covariate
+combination. This function averages those curves over the covariate values
+of the detected animals. It does not evaluate one curve at the mean
+covariate values, which is a different and less meaningful quantity.
+
+\code{at} fixes named covariates at chosen values. Covariates not named in \code{at}
+are still averaged over their observed values.
 }
 
-\section{Why the area under this curve is not \code{esw}}{
+\section{Relation to \code{esw} and average detection probability}{
 
-For an intercept-only model, the mean of this curve over the truncation width
-is exactly the fitted average detection probability, and the area under it is
-the effective strip half-width in \code{\link[=selection_table]{selection_table()}}. The tests assert that.
+The average detection probability \eqn{p} is the mean of \eqn{g(x)} over the
+truncation interval. The effective strip half-width (\code{esw}) in
+\code{\link[=selection_table]{selection_table()}} is \eqn{p} times the width of that interval.
 
-For a \strong{covariate} model the two differ slightly, and it is worth knowing
-why rather than discovering it. \code{mrds} reports \code{average.p} as a
-Horvitz-Thompson mean, \eqn{n / \sum 1/p_i}, which weights each animal by the
-inverse of its own detection probability — correcting for the fact that a
-sample of detections over-represents the covariate values that are easy to
-detect. The curve here is the plain arithmetic mean over the animals as
-observed, \eqn{(1/n) \sum g(x \mid z_i)}, which is what you want to look at
-next to a histogram of those same animals' distances.
+For an intercept-only model, the mean of the curve returned here equals the
+fitted \eqn{p}. The package tests check this.
 
-The two coincide when detection probability is constant, and differ by a
-fraction of a percent otherwise. \code{esw} in the selection table uses the
-Horvitz-Thompson version, so eyeballing the area under this curve will not
-reproduce it exactly for a covariate model.
+For a covariate model the two differ slightly. \code{mrds} reports \code{average.p} as
+a Horvitz-Thompson mean, \eqn{n / \sum 1/p_i}, which weights each animal by
+the inverse of its own detection probability. This curve is the plain mean
+over the detected animals, \eqn{(1/n) \sum g(x \mid z_i)}, which is the right
+curve to compare with a histogram of their distances. On the package's
+covariate test fixture (half-normal, \code{~bf}, width 400) the plain mean is
+0.401 and \code{average.p} is 0.388, a difference of 3.5\%. The area under this
+curve therefore does not reproduce \code{esw} exactly for a covariate model.
 }
 
-\section{The interval is a delta-method approximation}{
+\section{The interval}{
 
-\eqn{g(x)} is deterministic given the fitted parameters, so the uncertainty
-comes from them: the Jacobian of \eqn{g} with respect to the parameter vector
-is taken numerically and combined with the inverse Hessian. The result is
-clamped to \verb{[0, 1]}, since a probability cannot leave it — which means an
-interval touching 0 or 1 is a bound, not an estimate. Where the Hessian
-cannot be inverted the estimates are returned with missing bounds rather than
-no estimates.
+\eqn{g(x)} is a fixed function of the fitted parameters, so its uncertainty
+comes from theirs. The Jacobian of \eqn{g} with respect to the parameters is
+computed numerically and combined with the inverse Hessian (the delta
+method). Bounds are clamped to \verb{[0, 1]}, so a bound at 0 or 1 is a limit,
+not an estimate. If the Hessian cannot be inverted, a warning is given and
+the bounds are \code{NA}.
+
+\code{fancyfx} sends models it does not recognise to \code{marginaleffects}, which
+finds no predictors in a \code{ddf} object. This method is what lets a \code{ddf} be
+plotted.
 }
 
 \examples{
@@ -138,7 +146,7 @@ est <- effect_estimates_ddf(fit)
 head(est)
 attr(est, "quantity")
 
-# The integral of the curve is the fitted average detection probability
+# The mean of the curve is the fitted average detection probability
 mean(est$.estimate) # approximately summary(fit)$average.p
 \dontshow{\}) # examplesIf}
 }

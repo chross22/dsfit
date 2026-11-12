@@ -8,77 +8,92 @@ model_set(key = c("hn", "hr"), adjustment = NULL, order = NULL, formula = ~1)
 }
 \arguments{
 \item{key}{Character vector of key functions: any of \code{"hn"}, \code{"hr"},
-\code{"unif"}, \code{"gamma"}.}
+\code{"unif"}, \code{"gamma"}. Default \code{c("hn", "hr")}.}
 
-\item{adjustment}{Adjustment series: \code{NULL} (none), \code{"cos"}, \code{"herm"}, or
-\code{"poly"}. A vector expands to one candidate per series.}
+\item{adjustment}{Character vector of adjustment series: \code{"cos"} (cosine),
+\code{"herm"} (Hermite polynomial) or \code{"poly"} (simple polynomial). One
+candidate per series. \code{NULL} (default) fits no adjustment terms.}
 
 \item{order}{Integer vector of highest adjustment orders, one candidate per
-element. Orders are cumulative, as in \code{Distance::ds()}: each candidate
-carries every term of its series up to \code{order}, so \code{order = 3} on
-\code{hn} with \code{"cos"} fits \code{adj.order = c(2, 3)}. The series are cosine
-2, 3, 4, ... (1, 2, 3, ... for \code{unif}) and Hermite or simple polynomial
-4, 6, 8, ... (2, 4, 6, ... for \code{unif}). \code{NULL} (default) gives one term,
-the first of the series. An order outside a key's series is dropped with
-a warning. Ignored when \code{adjustment} is \code{NULL}.}
+element. Orders are cumulative, as in \code{Distance::ds()}: a candidate carries
+every term of its series up to \code{order}. For example, \code{order = 3} on \code{"hn"}
+with \code{"cos"} fits \code{adj.order = c(2, 3)}. Cosine orders run 2, 3, 4, ...
+(1, 2, 3, ... for \code{"unif"}). Hermite and polynomial orders run 4, 6, 8, ...
+(2, 4, 6, ... for \code{"unif"}). \code{NULL} (default) gives the first term of the
+series only. An order outside its series is dropped with a warning.
+Ignored when \code{adjustment} is \code{NULL}.}
 
 \item{formula}{One-sided formula, or a list of them, giving detection
-covariates. \code{~1} (default) is no covariates. Anything else fits through
-\code{mcds} rather than \code{cds}.}
+covariates. \code{~1} (default) means no covariates and fits with \code{cds}; any
+other formula fits with \code{mcds}.}
 }
 \value{
-A tibble with one row per candidate: \code{model_id}, \code{key},
-\code{adjustment}, \code{order}, \code{formula}, and the \code{dsmodel} string \code{mrds} is given.
+A tibble with one row per candidate and columns:
+\describe{
+\item{\code{model_id}}{Label, e.g. \code{"hn"}, \code{"hr+cos(2,3)"}, \code{"hn wt_beaufort"}.}
+\item{\code{key}}{Key function.}
+\item{\code{adjustment}}{Adjustment series, or \code{NA}.}
+\item{\code{order}}{Highest adjustment order, or \code{NA}.}
+\item{\code{formula}}{Covariate formula as a string.}
+\item{\code{dsmodel}}{The model formula string passed to \code{mrds::ddf()}.}
+}
 }
 \description{
-Expands key functions, adjustment terms, and covariate formulas into a grid
-of candidate models, one row each, ready for \code{\link[=sweep_models]{sweep_models()}}.
+Expands key functions, adjustment series and covariate formulas into a grid
+of candidate models, one row per candidate. Pass the result to
+\code{\link[=sweep_models]{sweep_models()}} to fit them all.
 }
-\section{The key functions}{
+\section{How it works}{
+
+\enumerate{
+\item Checks that every key, adjustment series, order and formula is valid.
+\item Crosses keys, series, orders and formulas into a grid.
+\item Drops, with a warning, candidates that cannot be fitted meaningfully:
+a uniform key with no adjustment, a uniform key with covariates, and an
+adjustment order outside its series.
+\item Builds each candidate's \code{mrds} model string and its \code{model_id} label.
+\item Drops, with a warning, duplicate candidates.
+}
+}
+
+\section{Key functions}{
 
 \describe{
-\item{\code{"hn"}}{Half-normal. A shoulder at zero and a smooth fall-off; the
+\item{\code{"hn"}}{Half-normal. A shoulder at zero and a smooth fall-off. The
 usual default.}
-\item{\code{"hr"}}{Hazard-rate. A broader shoulder and a heavier tail, at the
-cost of a second parameter.}
-\item{\code{"unif"}}{Uniform. Detection certain out to the truncation distance —
-a strip transect. Only interesting with adjustment terms, and takes no
-covariates, having no scale parameter for them to act on. Both cases
-are dropped with a warning.}
-\item{\code{"gamma"}}{Gamma. \strong{Unimodal, with its peak away from zero}, so
-detection is lowest on the track-line. Not available in
-\code{Distance::ds()}, which is one reason this package fits through \code{mrds}
-directly.}
+\item{\code{"hr"}}{Hazard-rate. A broader shoulder and a heavier tail, with a
+second parameter.}
+\item{\code{"unif"}}{Uniform. Detection is certain out to the truncation
+distance, which is a strip transect. It is kept only with adjustment
+terms. It takes no covariates, because it has no scale parameter for
+them to act on.}
+\item{\code{"gamma"}}{Gamma. Unimodal, with its peak away from zero, so
+detection is lowest on the track-line. \code{mrds} scales it to 1 at its
+peak, not at zero. Not available in \code{Distance::ds()}.}
 }
 }
 
-\section{When gamma is the right shape, and when it is a trap}{
+\section{Gamma key and left truncation}{
 
-An aircraft cannot see the water directly beneath it, and neither can a ship
-see past its own bow wave. Where that is true the gamma key describes the
-survey rather than distorting it, and a half-normal forced through a peak at
-zero will misfit the near distances.
-
-But a gamma key and a \strong{left truncation model the same phenomenon}. Using
-both accounts for the blind spot twice. Pick one deliberately and record
-which — \code{\link[=sweep_models]{sweep_models()}} takes \code{left} for the other route, and will warn if a
-model set containing gamma is fitted with one.
-
-Note also that gamma does not assume \code{g(0) = 1}, so its \verb{p̄} is not
-comparable to a half-normal's in the way a shared assumption would make it.
-That is a reason to read the whole selection table rather than its first row.
+An aircraft cannot see the water directly beneath it, and a ship cannot see
+past its bow wave. For such a platform the gamma key fits the near distances
+better than a half-normal, which must peak at zero. Left truncation models
+the same blind spot by discarding the near distances. Use one or the other,
+not both. \code{\link[=sweep_models]{sweep_models()}} takes \code{left} and warns if it is set for a model
+set that contains the gamma key.
 }
 
 \examples{
+# Default: half-normal and hazard-rate, no adjustments or covariates
 model_set()
 
-# With adjustments
+# Cosine adjustments up to orders 2 and 3
 model_set(key = c("hn", "hr"), adjustment = "cos", order = 2:3)
 
-# With a detection covariate
+# With and without a detection covariate
 model_set(key = "hn", formula = list(~1, ~wt_beaufort))
 
-# The unimodal key, for a platform with a blind spot beneath it
+# The gamma key, for a platform that cannot see beneath itself
 model_set(key = c("hn", "gamma"))
 
 }
@@ -93,8 +108,8 @@ distance zero. In \emph{Advanced Distance Sampling}, Oxford University Press.
 Becker, E.A. and Quang, P.X. (2009) A gamma-shaped detection function for
 line-transect surveys with mark-recapture and covariate data. \emph{Journal of
 Agricultural, Biological and Environmental Statistics} 14:207-223.
-\doi{10.1198/jabes.2009.0013} The gamma key function, and the aerial-survey
-case it was developed for.
+\doi{10.1198/jabes.2009.0013} Source of the gamma key, developed for aerial
+surveys.
 }
 \seealso{
 \code{\link[=sweep_models]{sweep_models()}}

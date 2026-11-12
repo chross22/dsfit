@@ -7,75 +7,125 @@
 prepare_distance_data(data, truncation, left = NULL, breaks = NULL)
 }
 \arguments{
-\item{data}{A data frame with \code{distance}, or with \code{distbegin} and \code{distend}.}
+\item{data}{Data frame, one row per detection. Needs a numeric \code{distance}
+column (exact) or numeric \code{distbegin} and \code{distend} columns (binned).
+Optional columns: \code{object} (detection ID) and \code{distance_source}.}
 
-\item{truncation}{Right truncation distance.}
+\item{truncation}{Number. Right truncation distance, in the units of the
+distances. Required.}
 
-\item{left}{Left truncation distance, or \code{NULL}.}
+\item{left}{Number or \code{NULL} (default). Left truncation distance. \code{NULL}
+means no left truncation.}
 
-\item{breaks}{Bin cutpoints for interval data. Derived from the data when
-\code{NULL}.}
+\item{breaks}{Numeric vector or \code{NULL} (default). Bin cutpoints for binned
+data, strictly increasing. Derived from the bins when \code{NULL}. Ignored,
+with a warning, for exact data.}
 }
 \value{
-A list with \code{data} (ready for \code{mrds}), \code{binned}, \code{breaks}, and
-\code{n_dropped}, and \code{dropped} — the attrition split by reason, so a
-truncation that trimmed a tail is distinguishable from one that threw away
-half the survey.
+A list:
+\describe{
+\item{\code{data}}{The prepared data frame, ready for \code{mrds::ddf()}.}
+\item{\code{binned}}{\code{TRUE} for binned data, \code{FALSE} for exact.}
+\item{\code{breaks}}{The cutpoints used (binned), or \code{NULL} (exact).}
+\item{\code{n_dropped}}{Number of input rows not in \code{data}.}
+\item{\code{dropped}}{Named integer vector splitting the drops by reason:
+\code{no_distance}, \code{beyond_truncation}, \code{inside_left}. It shows whether
+truncation trimmed a tail or removed most of the survey.}
+}
 }
 \description{
-Validates the table a sweep is about to be fitted to and puts it in the shape
-\code{mrds} wants. Called by \code{\link[=sweep_models]{sweep_models()}}; exported because the checks are
-worth running on their own before committing to a model set.
+Checks a table of detections and returns it in the form \code{mrds::ddf()}
+expects. \code{\link[=sweep_models]{sweep_models()}} calls it before fitting. It is exported so the
+checks can be run on their own before a sweep.
 }
-\section{What it refuses}{
+\details{
+Distances are either \emph{exact} (one \code{distance} per detection) or \emph{binned}
+(an interval \code{distbegin} to \code{distend} per detection, as recorded by strip
+or band surveys). The two are fitted with different likelihoods.
+}
+\section{How it works}{
 
-\describe{
-\item{Both point and interval distances}{\code{STRIP}-derived distances are
-intervals and are fitted binned; angle- and position-derived distances
-are points. The likelihoods differ, so one sweep cannot rank both. A
-table containing both marks a survey-era boundary, and should be split on
-its provenance column and swept separately.}
-\item{An unbounded top bin}{\code{distend} of \code{Inf} cannot be fitted. The open
-top bin of every \code{STRIP} scheme has to be dropped or closed before
-fitting.}
-\item{Bins that do not tile}{Interval data whose \code{distbegin}/\code{distend}
-pairs leave gaps or overlap does not define a set of cutpoints, and any
-\code{breaks} derived from it would silently misallocate detections.}
-\item{Bins that stop short of the truncation}{A binned fit integrates the
-detection function over the bins. If the top bin ends before the
-truncation width, the strip between them is unaccounted effort and the
-fit describes a narrower survey than the one flown.}
-\item{Bins that start beyond \code{left}}{The same gap at the near end: the
-lowest break must equal \code{left}, or zero without it. Derived breaks fall
-short when the innermost bin had no detections, and a \code{left} inside a
-bin drops that bin's detections; supply \code{breaks} in either case.}
-\item{Break-off distances}{\code{distance_source == "break_off"}, which
-\code{distsamp} gives a circling sighting with no exact position: a slant
-distance from where the aircraft left the line, not a perpendicular
-one.}
+The steps run in this order. The first refusal stops the function with an
+error.
+\enumerate{
+\item Check the arguments. \code{data} must be a data frame. \code{truncation} must be
+one positive finite number. \code{left}, if given, must be one non-negative
+finite number smaller than \code{truncation}.
+\item Check the distance columns. Any of \code{distance}, \code{distbegin} and \code{distend}
+that is present must be numeric (an all-\code{NA} column is allowed) and must
+not be negative.
+\item Decide the distance type. Refuse a table with no distances, and refuse a
+table with both exact and binned distances.
+\item Check \code{distance_source}, if present, on the rows with an exact
+\code{distance}. Refuse \code{"break_off"} distances. Warn about \code{"circling"}
+distances. Only rows that will be fitted (within \code{left} to \code{truncation})
+are counted.
+\item Count, by reason, the rows that will be dropped: no distance, beyond
+\code{truncation}, or inside \code{left}.
+\item For binned data:
+\enumerate{
+\item Drop rows with a missing \code{distbegin} or \code{distend}.
+\item Refuse any \code{distend} of \code{Inf}.
+\item Drop bins that end beyond \code{truncation} or begin inside \code{left}.
+\item Refuse if no rows remain.
+\item Derive \code{breaks} from the bins, refusing bins that do not tile; or,
+if \code{breaks} is supplied, check that it contains every recorded bin
+edge.
+\item Refuse if the highest break is not \code{truncation}.
+\item Refuse if the lowest break is not \code{left} (or 0 when \code{left} is
+\code{NULL}).
+\item Remove the \code{distance} column.
+}
+\item For exact data:
+\enumerate{
+\item Warn that \code{breaks} is ignored, if it was supplied.
+\item Remove the \code{distbegin} and \code{distend} columns.
+\item Drop rows with no distance, beyond \code{truncation}, or inside \code{left}.
+\item Refuse if no rows remain.
+}
+\item Add an \code{object} column numbering the rows if there is none. Refuse
+duplicated \code{object} values.
+}
+
+Rows with no distance are how a flatfile records a sample with no
+detections, so dropping them is expected. Every dropped row is counted in
+the return value.
+}
+
+\section{What it refuses and why}{
+\tabular{ll}{
+   Condition \tab Reason \cr
+   Non-numeric distances \tab Text or factor codes would be compared to \code{truncation} as text or level numbers, keeping the wrong rows. \cr
+   Negative distances \tab A perpendicular distance has no side. Use \code{abs()} if the sign records the side of the line. \cr
+   Exact and binned distances together \tab The two likelihoods differ, so their AICs cannot be compared in one sweep. Split the table on its distance-source column and sweep each part. \cr
+   \code{distance_source == "break_off"} \tab A break-off distance runs from where the aircraft left the line to the logged position. It is not perpendicular to the line. \cr
+   \code{distend} of \code{Inf} \tab An open top bin cannot be fitted. Drop those rows or close the bin. This applies even if truncation would drop the bin. \cr
+   Bins that do not tile (derived \code{breaks}) \tab If bins leave gaps or overlap, they do not define one set of cutpoints. \cr
+   \code{breaks} missing a recorded bin edge \tab Goodness of fit is computed over \code{breaks}, so \code{breaks} must be the survey's own cutpoints. \cr
+   Highest break not equal to \code{truncation} \tab A binned fit integrates over the bins. A gap between the top bin and \code{truncation} is effort with no bin. \cr
+   Lowest break not equal to \code{left} (or 0) \tab The same gap at the near end. It occurs when the innermost bin had no detections, or when \code{left} falls inside a bin. Supply \code{breaks} to fix it. \cr
+   No rows left after truncation \tab There is nothing to fit. \cr
+   Duplicated \code{object} \tab \code{mrds} identifies detections by \code{object}. \cr
 }
 }
 
 \section{What it warns about}{
 
-\code{distance_source == "circling"}: a circling sighting's exact position
-projected onto the census line. The right quantity, but fixed minutes after
-the detection, and excluded by \code{distsamp::detection_data()} unless
-\code{include_circling = TRUE}. Admitted, with the count, so the choice is made
-knowingly.
+\itemize{
+\item \code{distance_source == "circling"}: the animal's position while the aircraft
+circled, projected onto the line. It is a perpendicular distance, but
+measured minutes after the detection. \code{distsamp::detection_data()}
+excludes these rows unless \code{include_circling = TRUE}. They are kept, and
+the warning gives their count.
+\item \code{breaks} supplied with exact distances: it is ignored.
 }
-
-\section{What it drops, and reports}{
-
-Rows with no distance at all — which is how a flatfile records a sample that
-produced no detections — and rows beyond \code{truncation} or inside \code{left}.
-Dropping is counted, never silent.
 }
 
 \examples{
 d <- data.frame(object = 1:5, distance = c(10, 50, 120, NA, 900))
 prep <- prepare_distance_data(d, truncation = 400)
 prep$n_dropped
+prep$dropped
 prep$data
 
 }

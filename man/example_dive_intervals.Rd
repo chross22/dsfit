@@ -3,7 +3,7 @@
 \docType{data}
 \name{example_dive_intervals}
 \alias{example_dive_intervals}
-\title{Example surfacing and diving intervals, by month}
+\title{Example surfacing and diving intervals, by month (invented)}
 \format{
 A tibble with 6 rows and 5 columns:
 \describe{
@@ -18,33 +18,32 @@ A tibble with 6 rows and 5 columns:
 example_dive_intervals
 }
 \description{
-A worked example for \code{\link[=availability]{availability()}}: mean surfacing and diving intervals
-over a six-month season, with standard errors.
+Invented mean surfacing and diving intervals, with standard errors, for six
+months. Use them to try \code{\link[=availability]{availability()}}. They are not measurements and
+must not be used to correct anything.
 }
-\section{These numbers are invented}{
+\section{What the numbers show}{
 
-They are not measurements. In particular they are \strong{not} Ganley et al.
-(2019)'s Cape Cod Bay values, which are not open access. Do not use them to
-correct anything.
+The values are invented, and are not Ganley et al. (2019)'s Cape Cod Bay
+values, which ship as \link{ganley_availability}.
 
-What is real is the pattern they were built to show. Ganley et al. (2019)
-found right whale availability in Cape Cod Bay varying by month between
-\strong{0.27 and 0.85}, tracking the depth of the copepod layer the whales were
-feeding on: feeding deep means long dives and little time at the surface,
-feeding shallow means available most of the time. These intervals reproduce
-that shape, and running \code{\link[=availability]{availability()}} over them spans roughly 0.25 to
-0.85 — which is the point of shipping them. A single representative
-availability is a real number for one month and wrong by a factor of two for
-others.
+They copy a real pattern. Ganley et al. (2019) found right whale
+availability in Cape Cod Bay varying by month between 0.27 and 0.85 (the
+range in their abstract), following the depth of the copepods the whales
+fed on. Deep feeding means long dives and little surface time; shallow
+feeding means the whales are available most of the time. With a 12 s window
+(\code{view_window(radius = 300, speed = 50)}), \code{\link[=availability]{availability()}} on these
+intervals ranges from about 0.25 to 0.85. A single constant suited to one
+month is wrong by a factor of three or more for another.
 
-Real dive parameters come from focal follows, tagging, or drone work, and are
-specific to a place, a season and a behaviour. Substitute your own.
+Real dive intervals come from focal follows, tags or drones, and depend on
+place, season and behaviour. Substitute your own.
 }
 
 \examples{
 example_dive_intervals
 
-# The season's availability, from these intervals and a platform's geometry
+# Availability for the season, from these intervals and a 12 s window
 availability(
   surface    = example_dive_intervals$surface,
   dive       = example_dive_intervals$dive,
@@ -58,8 +57,7 @@ availability(
 Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there
 is: estimating North Atlantic right whale \emph{Eubalaena glacialis} local
 abundance. \emph{Endangered Species Research} 38:101-113.
-\doi{10.3354/esr00938} The monthly pattern these values imitate, and the real
-measurements they are not.
+\doi{10.3354/esr00938} The monthly pattern these invented values copy.
 }
 \seealso{
 \code{\link[=availability]{availability()}}, \code{\link[=view_window]{view_window()}}

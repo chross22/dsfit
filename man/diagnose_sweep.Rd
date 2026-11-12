@@ -2,43 +2,126 @@
 % Please edit documentation in R/diagnose.R
 \name{diagnose_sweep}
 \alias{diagnose_sweep}
-\title{Diagnose common reasons a sweep fails, or succeeds meaninglessly}
+\title{Check a sweep's inputs before fitting}
 \usage{
 diagnose_sweep(data, models = NULL, truncation, left = NULL, breaks = NULL)
 }
 \arguments{
-\item{data}{A data frame with one row per detection, as \code{\link[=sweep_models]{sweep_models()}}
-takes.}
+\item{data}{Data frame, one row per detection, in the form
+\code{\link[=sweep_models]{sweep_models()}} takes.}
 
-\item{models}{A \code{\link[=model_set]{model_set()}}, or \code{NULL} for the default set.}
+\item{models}{A \code{\link[=model_set]{model_set()}}, or \code{NULL} (default) for the default set.}
 
-\item{truncation}{Right truncation distance. Required, as it is for a sweep.}
+\item{truncation}{Number. Right truncation distance, in the units of the
+distances. Required, as for a sweep.}
 
-\item{left}{Left truncation distance, or \code{NULL}.}
+\item{left}{Number or \code{NULL} (default). Left truncation distance.}
 
-\item{breaks}{Bin cutpoints for interval data, or \code{NULL} to derive them.}
+\item{breaks}{Numeric vector or \code{NULL} (default). Bin cutpoints for binned
+data; derived from the bins when \code{NULL}.}
 }
 \value{
-Invisibly, \code{list(structure, prepared, models)} — whichever were
-reached before a fatal problem stopped the checks, so investigation can
-pick up from there.
+Invisibly, a list with the results reached before any stop:
+\describe{
+\item{\code{structure}}{The \code{\link[=detection_structure]{detection_structure()}} result, or \code{NULL} if the
+data could not be read.}
+\item{\code{prepared}}{The \code{\link[=prepare_distance_data]{prepare_distance_data()}} result, or \code{NULL} if it
+failed. Absent if the report stopped earlier.}
+\item{\code{models}}{The model set checked. Absent if the report stopped
+earlier.}
+}
+The report itself is printed to the console.
 }
 \description{
-Runs the input guards, the truncation, and the model-set expansion — never
-\code{mrds::ddf()} itself — and reports the most common ways a sweep goes wrong
-before it reaches the fitting: a truncation that throws away most of the
-survey, a covariate formula naming a column that is not there, a model set
-that double-counts the blind spot, or too few detections left to fit
-anything worth reading.
+Runs the checks a sweep would run, without calling \code{mrds::ddf()}, and prints
+a report of problems found. Use it before \code{\link[=sweep_models]{sweep_models()}} to catch a
+misconfiguration in seconds, instead of after a sweep that errors inside
+\code{mrds} or returns a table that looks valid but is not.
 }
 \details{
-Meant to run \emph{before} \code{\link[=sweep_models]{sweep_models()}}, so a misconfiguration is caught in
-seconds rather than after a sweep that either errors from inside \code{mrds} or
-returns a table that looks fine and is not.
-
-Every check here reports a problem rather than fixing it. This function never
-modifies the data, the model set, or anything else.
+The function only reports. It never changes the data or the model set.
 }
+\section{How it works}{
+
+Each finding is printed as one line marked \code{ok}, \code{note}, \code{WARN} or \code{FAIL}.
+A \code{note} is a fact about how the survey was flown (for example, a single
+observer team); it does not count as a problem. \code{WARN} and \code{FAIL} lines
+count as problems. A failure marked "stops" below ends the report early.
+\enumerate{
+\item Refuse to run if \code{truncation} is missing (an error, not a report line).
+\item Toolchain: check \code{mrds} is installed (\code{WARN} if not).
+\item Data: read the table with \code{\link[=detection_structure]{detection_structure()}}.
+\itemize{
+\item \code{FAIL} and stop if it cannot be read.
+\item \code{FAIL} if it has no distances; otherwise report the count and type.
+\item \code{WARN} for each pair of columns that name the same variable.
+\item \code{WARN} for each analysis whose structure is incomplete (\code{supported}
+is \code{NA}), such as a partial double-observer setup.
+\item \code{note} if perception bias cannot be estimated or there is no \code{size}
+column.
+}
+\item Truncation: run \code{\link[=prepare_distance_data]{prepare_distance_data()}}.
+\itemize{
+\item Its warnings are printed as \code{WARN} lines. Its errors are printed as a
+\code{FAIL} line and stop the report.
+\item Report how many rows were kept, and how many were dropped for each
+reason.
+\item \code{WARN} if truncation removes more than 50\% of the rows that have a
+distance.
+}
+\item Sample size: \code{FAIL} below 40 detections after truncation, \code{WARN}
+below 60, \code{ok} otherwise (Buckland et al. 2001).
+\item Model set: build the default \code{\link[=model_set]{model_set()}} or check the one given.
+\code{FAIL} and stop if that errors; otherwise list the candidates.
+\item Blind spot: see the section below.
+\item Covariates: \code{FAIL} if a formula names a column not in \code{data}.
+Otherwise \code{WARN} for a covariate with only one value, and for one with
+missing values (mrds drops those rows).
+\item Print a reminder that g(0) = 1 is assumed unless corrected at the
+abundance step. g(0) is the detection probability on the trackline. An
+error in it scales every candidate equally, so no check here can detect
+it. See \code{\link[=g0]{g0()}}.
+\item Print a final line: no problems found, or problems above.
+}
+
+The constant and missing-value covariate checks use the rows that will be
+fitted, after truncation, since mrds never sees the rest.
+}
+
+\section{Blind-spot check}{
+
+A \emph{blind spot} is a strip next to the trackline where the platform cannot
+see, such as beneath an aircraft. It shows as no detections close to the
+line.
+
+The check fires when the nearest detection in the input data is more than
+2\% of \code{truncation} from the line. Every dataset has a smallest distance, so
+a nonzero nearest distance alone is not evidence of a blind spot. The 2\%
+threshold is a heuristic.
+
+There are two treatments, and they are alternatives: left truncation
+(\code{left}), or the gamma key, which models detection rising from zero at the
+line. The check reports:\tabular{ll}{
+   Situation \tab Result \cr
+   Gamma key in the set and \code{left} set (blind spot or not) \tab \code{WARN}: the blind spot is counted twice. \cr
+   Blind spot, \code{left} set, no gamma key \tab \code{ok} \cr
+   Blind spot, abrupt onset \tab \code{WARN}: a hard edge, which \code{left} removes and no key function fits, gamma included. \cr
+   Blind spot, gradual onset, gamma key in set \tab \code{ok} \cr
+   Blind spot, too few detections (under 40) to classify the onset, gamma key in set \tab \code{note} \cr
+   Blind spot, neither \code{left} nor gamma \tab \code{WARN} \cr
+}
+
+
+\emph{Abrupt onset} means detections start at close to their peak rate just
+beyond the empty strip. The range from the nearest detection to
+\code{truncation} is cut into 20 equal bins. The onset is abrupt when the first
+bin's count is more than 60\% of the largest bin's count. A geometric edge
+(a window frame, a hull) gives this shape. A gradual decline in
+detectability toward the line instead gives a rising first few bins, which
+is what the gamma key fits. The test needs at least 40 detections; with
+fewer, the onset is not classed as abrupt.
+}
+
 \examples{
 set.seed(1)
 d <- data.frame(
@@ -49,8 +132,14 @@ d <- data.frame(
 diagnose_sweep(d, model_set(c("hn", "hr")), truncation = 2000)
 
 }
+\references{
+Buckland, S.T., Anderson, D.R., Burnham, K.P., Laake, J.L., Borchers, D.L.
+and Thomas, L. (2001) \emph{Introduction to Distance Sampling.} Oxford University
+Press. Source of the 40 and 60-80 detection guidelines and of trimming
+roughly the outer 5\% of distances.
+}
 \seealso{
-\code{\link[=detection_structure]{detection_structure()}}, which this uses and which answers the
-different question of what the data could support in principle.
-\code{\link[=sweep_models]{sweep_models()}}, which this is meant to run ahead of.
+\code{\link[=detection_structure]{detection_structure()}}, which reports what the data could
+support in principle. \code{\link[=sweep_models]{sweep_models()}}, which this is meant to run
+before.
 }

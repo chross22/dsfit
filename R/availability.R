@@ -1,126 +1,136 @@
-#' Availability: the probability an animal was at the surface to be seen
+# Availability and view windows.
+#
+# Availability is the probability that an animal is at the surface, and so can
+# be seen, while it is within the observers' view. It is one component of g(0),
+# the probability of detecting an animal on the trackline. It is computed here
+# from dive data collected outside the survey, never estimated from the survey
+# distances. g0() in R/g0.R combines it with the other components.
+#
+# Contents, in file order:
+#   availability()        availability from surfacing and diving intervals
+#   view_window()         time in view for a circular viewing area
+#   view_window_aerial()  time in view for an aircraft side window
+#   view_window_vessel()  time in view for a ship's forward search arc
+#   check_recycle(), availability_one(), availability_se()   internal helpers
+
+
+#' Availability of an animal at the surface
 #'
-#' Computes the probability that an animal was available to be detected while it
-#' was within view, from its surfacing and diving intervals and the time the
-#' survey platform kept it in view. This is the availability component of
-#' `g(0)`, and it is **computed from external dive data, not estimated from the
-#' survey**.
+#' Computes availability: the probability that an animal is at the surface,
+#' and so can be seen, while it is within the observers' view. Use it to build
+#' the availability component of a `g(0)` correction, one row per key (month,
+#' platform, year), and pass the result to [g0()].
 #'
-#' @section Why this is a calculation and not an estimator:
-#' An animal submerged while the aircraft passes is missed at every
-#' perpendicular distance equally. To first order availability is a pure scale
-#' factor on \eqn{g(x)}: it does not dent the near-zero end of the distance
-#' distribution, does not change its shape, and leaves no signature for a
-#' likelihood to find. That is exactly why a mis-specified `g(0)` shifts every
-#' candidate in a [selection_table()] by the same factor and leaves the ranking
-#' looking untouched.
+#' @section Why availability is computed, not estimated:
+#' An animal that is submerged while the platform passes is missed at every
+#' perpendicular distance equally. Availability therefore scales the detection
+#' function \eqn{g(x)} without changing its shape, and the distances carry no
+#' information about it. The inputs come from outside the survey: `surface`
+#' and `dive` from focal follows, tags or drones, and `window` from the
+#' platform's geometry and speed.
 #'
-#' So there is nothing in the distances to estimate it from, and none of the
-#' inputs here come from the survey being corrected. `surface` and `dive` come
-#' from focal follows, tagging, or drone observation; `window` comes from the
-#' platform's geometry and speed. Both arrive with their own uncertainty, which
-#' is the point: it is visible rather than absorbed into a constant.
-#'
-#' @section The formula:
+#' @section How it works:
 #' Following Laake et al. (1997), for a mean surfacing interval \eqn{E(s)}, a
-#' mean diving interval \eqn{E(d)}, and a window \eqn{w} during which the animal
-#' is in view:
+#' mean diving interval \eqn{E(d)}, and a window \eqn{w} (the time the animal
+#' is in view):
 #'
 #' \deqn{a = \frac{E(s) + E(d)\left(1 - e^{-w/E(d)}\right)}{E(s) + E(d)}}
 #'
-#' The two limits are worth holding onto as a check on any number this returns.
-#' As \eqn{w \to 0} the window is instantaneous and \eqn{a} becomes
-#' \eqn{E(s)/(E(s) + E(d))}, the plain proportion of time spent at the surface.
-#' As \eqn{w \to \infty} the platform watches forever, every animal surfaces
-#' eventually, and \eqn{a \to 1}. The middle term is the extra chance that an
-#' animal which was down when the window opened comes up before it closes.
+#' At \eqn{w = 0}, \eqn{a} is \eqn{E(s)/(E(s) + E(d))}, the proportion of time
+#' at the surface. As \eqn{w} grows, \eqn{a} approaches 1. The middle term is
+#' the chance that an animal that was submerged when the window opened
+#' surfaces before it closes.
 #'
-#' @section There is no single availability, and that is the finding:
-#' Ganley et al. (2019) measured this for right whales in Cape Cod Bay and found
-#' availability varying by month from **0.27 in January to 0.91 in April**,
-#' tracking the depth of the copepod layer the whales were feeding on. Those
-#' measurements ship as [ganley_availability].
+#' 1. The inputs are checked and recycled to a common length. Each must have
+#'    length 1 or the common length.
+#' 2. `surface` and `dive` must be positive and `window` must not be negative.
+#' 3. `se_surface` and `se_dive` must be given together or not at all.
+#' 4. \eqn{a} is computed for each element.
+#' 5. If standard errors were given, the standard error of \eqn{a} is computed
+#'    by the delta method: the gradient of \eqn{a} with respect to
+#'    \eqn{(E(s), E(d))} is taken numerically and combined with their
+#'    covariance matrix, as in [effect_estimates_ddf()].
 #'
-#' A plausible-looking single figure is therefore the most dangerous input this
-#' package accepts. A value near 0.83 is a real number for some month, and wrong
-#' by a factor of three for others — and because it scales every model equally,
-#' no amount of model selection reveals it. Compute one per key and pass a
-#' vector, rather than picking a representative value.
+#' Without `se_surface` and `se_dive` the standard error is `NA`. The function
+#' does not invent a precision, because the CV of availability often dominates
+#' the CV of abundance. If the raw focal follows are available, bootstrapping
+#' them (as Ganley et al. 2019 did) avoids assuming the interval means are
+#' jointly normal; the result can be passed as `se_surface` and `se_dive`, or
+#' the component rows can be built directly.
 #'
-#' Note that this is availability alone. Perception is a separate component and
-#' a separate measurement, which Ganley et al. did not make — estimating it
-#' needs a second observer team. [g0()] will say so if you leave it out.
+#' @section Use one value per key, not one constant:
+#' Availability varies. Ganley et al. (2019) found right whale availability in
+#' Cape Cod Bay ranging from 0.27 in January to 0.91 in April, following the
+#' depth of the copepods the whales fed on (see [ganley_availability]). A
+#' single constant suited to one month can be wrong by a factor of three for
+#' another. Because it scales every candidate model equally, model selection
+#' cannot detect the error. Compute one value per key and pass a vector.
 #'
-#' @section How the standard error is obtained:
-#' Availability is deterministic given `surface`, `dive` and `window`, so the
-#' uncertainty comes from them. Given `se_surface` and `se_dive`, the Jacobian is
-#' taken numerically and combined with their covariance matrix — the same
-#' delta-method treatment [effect_estimates_ddf()] uses.
+#' This function gives availability only. Perception (whether an animal at the
+#' surface and in view is seen) is a separate component and needs a second
+#' observer team to estimate. [g0()] warns if it is missing.
 #'
-#' Where the raw focal follows are in hand, resampling them is better than this:
-#' Ganley et al. (2019) and others bootstrap the follows and take the standard
-#' deviation of the resulting availabilities, which does not assume the interval
-#' means are jointly normal. Do that and pass the result on as `se_surface` and
-#' `se_dive`, or bypass this and build the rows directly.
+#' @param surface Numeric. Mean surfacing interval, in seconds. Must be
+#'   positive. A vector gives one result per element.
+#' @param dive Numeric. Mean diving interval, in seconds. Must be positive.
+#'   Length 1 or the length of the longest input.
+#' @param window Numeric. Time the animal is in view, in seconds. Must not be
+#'   negative. Derive it with [view_window_aerial()], [view_window_vessel()] or
+#'   [view_window()]. Length 1 or the length of the longest input.
+#' @param se_surface,se_dive Numeric or `NULL` (default). Standard errors of
+#'   `surface` and `dive`, in seconds. Give both or neither: propagating one
+#'   and dropping the other would understate the total variance.
+#' @param cov_surface_dive Numeric. Covariance between the two interval means,
+#'   in seconds squared. Default `0`, which is right when they come from
+#'   separate follows and optimistic otherwise. Used only with standard errors.
+#' @param key Optional vector of labels (months, platforms, years), one per
+#'   result. Must have the same length as the result. Stored as character.
 #'
-#' Without `se_surface` and `se_dive` the standard error is `NA`, deliberately:
-#' this function will not invent a precision for a number whose CV routinely
-#' dominates the CV of abundance.
-#'
-#' @param surface Mean surfacing interval, in seconds. A vector gives one result
-#'   per element, which is how a per-month table is built.
-#' @param dive Mean diving interval, in seconds. Recycled against `surface`.
-#' @param window Time the animal is within view, in seconds. See [view_window()]
-#'   to derive it from platform geometry. Recycled against `surface`.
-#' @param se_surface,se_dive Standard errors of `surface` and `dive`. Both are
-#'   needed for a standard error on the result; either alone is an error, since
-#'   propagating one source of variance and silently dropping the other
-#'   understates the total.
-#' @param cov_surface_dive Covariance between the two interval means. Zero by
-#'   default, which is right when they are estimated from separate follows and
-#'   optimistic when they are not.
-#' @param key Optional labels — months, platforms, years — carried through to the
-#'   result so the rows stay attached to what they apply to.
-#'
-#' @return A tibble with one row per element of `surface`: `key`, `component`
-#'   (always `"availability"`), `value`, and `se`. That is the shape a `g(0)`
-#'   correction is assembled from, so availability and perception rows stack.
+#' @return A tibble with one row per element of the longest input, and columns:
+#'   \describe{
+#'     \item{key}{The label from `key`, or `NA`.}
+#'     \item{component}{Always `"availability"`.}
+#'     \item{value}{Availability, between 0 and 1.}
+#'     \item{se}{Standard error of `value`, or `NA` without `se_surface` and
+#'       `se_dive`.}
+#'   }
+#'   This is the component shape [g0()] accepts, so availability and perception
+#'   rows can be stacked.
 #'
 #' @references
 #' Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997) Probability
 #' of detecting harbor porpoise from aerial surveys: estimating g(0). *The
-#' Journal of Wildlife Management* 61:63-75. \doi{10.2307/3802415} The formula
-#' implemented here.
+#' Journal of Wildlife Management* 61:63-75. \doi{10.2307/3802415} Source of
+#' the formula.
 #'
 #' Laake, J.L. and Borchers, D.L. (2004) Methods for incomplete detection at
 #' distance zero. In *Advanced Distance Sampling*, pp. 108-189. Oxford University
-#' Press. Why perception needs a second observer team, and availability needs
-#' something outside the survey entirely.
+#' Press. Why perception and availability need separate data.
 #'
 #' Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there
 #' is: estimating North Atlantic right whale *Eubalaena glacialis* local
 #' abundance. *Endangered Species Research* 38:101-113.
-#' \doi{10.3354/esr00938} Focal follows and aircraft field of view applied to
-#' right whales, and the monthly variation quoted above.
+#' \doi{10.3354/esr00938} Focal follows and monthly availability for right
+#' whales.
 #'
 #' Roberts, J.J., Yack, T.M., Fujioka, E., Halpin, P.N., Baumgartner, M.F. and
 #' others (2024) North Atlantic right whale density surface model for the US
 #' Atlantic evaluated with passive acoustic monitoring. *Marine Ecology Progress
-#' Series* 732:167-192. \doi{10.3354/meps14547} Corrects perception and
-#' availability per platform, team and conditions across 11 institutions, which
-#' is the scale at which these corrections actually vary.
+#' Series* 732:167-192. \doi{10.3354/meps14547} Corrections for perception and
+#' availability by platform, team and conditions.
 #'
-#' @seealso [view_window()] for the window, [sweep_models()] for why none of this
-#'   belongs in the detection function fit.
+#' @seealso [view_window_aerial()], [view_window_vessel()] and [view_window()]
+#'   for the window; [g0()] for combining components; [sweep_models()] for the
+#'   detection function fit, which this does not enter.
 #'
 #' @examples
-#' # An instantaneous window is the proportion of time at the surface
+#' # With a zero window, availability is the proportion of time at the surface
 #' availability(surface = 60, dive = 240, window = 0)
 #'
-#' # A real window lifts it: some animals that were down come up in time
+#' # A longer window raises it: some submerged animals surface in time
 #' availability(surface = 60, dive = 240, window = 30)
 #'
-#' # One row per month, which is how it is actually used
+#' # One row per month
 #' availability(
 #'   surface = c(45, 60, 90),
 #'   dive    = c(300, 240, 150),
@@ -128,7 +138,7 @@
 #'   key     = c("Feb", "Mar", "Apr")
 #' )
 #'
-#' # With uncertainty on the intervals
+#' # With standard errors on the intervals
 #' availability(surface = 60, dive = 240, window = 24,
 #'              se_surface = 8, se_dive = 25)
 #'
@@ -137,12 +147,15 @@ availability <- function(surface, dive, window, se_surface = NULL,
                          se_dive = NULL, cov_surface_dive = 0, key = NULL) {
   stopifnot(is.numeric(surface), is.numeric(dive), is.numeric(window))
 
+  # Recycle the three inputs to a common length n, allowing only length 1 or n.
   n <- max(length(surface), length(dive), length(window))
   if (n == 0L) rlang::abort("`surface`, `dive` and `window` are all empty.")
+  check_recycle(list(surface = surface, dive = dive, window = window), n)
   surface <- rep_len(surface, n)
   dive <- rep_len(dive, n)
   window <- rep_len(window, n)
 
+  # Check ranges. NA is allowed and passes through to an NA result.
   if (any(!is.na(surface) & surface <= 0) || any(!is.na(dive) & dive <= 0)) {
     rlang::abort(paste0(
       "`surface` and `dive` are interval durations in seconds and must be ",
@@ -154,8 +167,8 @@ availability <- function(surface, dive, window, se_surface = NULL,
     rlang::abort("`window` is a duration in seconds and cannot be negative.")
   }
 
-  # One of se_surface/se_dive without the other would propagate half the
-  # variance and report it as though it were all of it.
+  # Require both standard errors or neither. One alone would propagate half
+  # the variance and report it as the whole.
   has_se <- !is.null(se_surface) || !is.null(se_dive)
   if (has_se && (is.null(se_surface) || is.null(se_dive))) {
     rlang::abort(paste0(
@@ -164,7 +177,10 @@ availability <- function(surface, dive, window, se_surface = NULL,
       "which is worse than reporting none."
     ))
   }
+  # Recycle and check the standard errors and covariance.
   if (has_se) {
+    check_recycle(list(se_surface = se_surface, se_dive = se_dive,
+                       cov_surface_dive = cov_surface_dive), n)
     se_surface <- rep_len(se_surface, n)
     se_dive <- rep_len(se_dive, n)
     cov_surface_dive <- rep_len(cov_surface_dive, n)
@@ -174,6 +190,7 @@ availability <- function(surface, dive, window, se_surface = NULL,
     }
   }
 
+  # `key` is not recycled: it must label every row.
   if (!is.null(key) && length(key) != n) {
     rlang::abort(paste0(
       "`key` has length ", length(key), " but there are ", n,
@@ -182,10 +199,13 @@ availability <- function(surface, dive, window, se_surface = NULL,
     ))
   }
 
+  # Availability for each element.
   value <- vapply(seq_len(n), function(i) {
     availability_one(c(surface[i], dive[i]), window[i])
   }, numeric(1))
 
+  # Delta-method standard error for each element, using a 2 x 2 covariance
+  # matrix of (surface, dive). NA when no standard errors were given.
   se <- rep(NA_real_, n)
   if (has_se) {
     se <- vapply(seq_len(n), function(i) {
@@ -197,6 +217,7 @@ availability <- function(surface, dive, window, se_surface = NULL,
     }, numeric(1))
   }
 
+  # Return in the component shape g0() accepts.
   tibble::tibble(
     key = if (is.null(key)) rep(NA_character_, n) else as.character(key),
     component = "availability",
@@ -206,69 +227,63 @@ availability <- function(surface, dive, window, se_surface = NULL,
 }
 
 
-#' The time an animal stays within view of the platform
+#' Time in view for a circular viewing area
 #'
-#' Turns platform geometry into the `window` [availability()] needs: how long a
-#' point on the water remains inside the observers' field of view as the platform
-#' passes.
+#' Computes the `window` for [availability()] when the observers watch a
+#' circular area around the platform, fore and aft alike. The window is the
+#' time a point on the water spends inside that circle as the platform passes.
+#' For an aircraft side window use [view_window_aerial()]; for a ship's
+#' forward search use [view_window_vessel()].
 #'
-#' @section The geometry:
-#' For a circular field of view of radius \eqn{r} and a platform travelling at
-#' speed \eqn{v}, a point at perpendicular distance \eqn{x} is crossed along a
-#' chord of length \eqn{2\sqrt{r^2 - x^2}}, so
+#' @section How it works:
+#' For a viewing radius \eqn{r} and platform speed \eqn{v}, a point at
+#' perpendicular distance \eqn{x} is crossed along a chord of length
+#' \eqn{2\sqrt{r^2 - x^2}}, so
 #'
 #' \deqn{w(x) = \frac{2\sqrt{r^2 - x^2}}{v}}
 #'
-#' The window therefore shrinks with perpendicular distance, and is zero beyond
-#' the edge of the view — an animal outside it is never available, which this
-#' returns as `0` rather than as an error.
+#' The window is widest on the trackline, shrinks with distance, and is `0`
+#' beyond the radius.
 #'
-#' @section This is the wrong geometry for most aerial surveys:
-#' A circular viewing area is what a platform watching a fixed patch has. An
-#' **aircraft observer looking through a side window does not have one**: the
-#' field of view is an angular wedge running forward and aft, so an animal
-#' further off the trackline sits in that wedge *longer*, not less. The window
-#' **grows** with perpendicular distance, and this function has the sign of that
-#' effect backwards for such a platform.
+#' @section Which platform this fits:
+#' Only a platform that watches a circular area. An aircraft observer looking
+#' through a side window sees a wedge running forward and aft, so time in view
+#' grows with perpendicular distance instead of shrinking; this function gets
+#' that direction wrong. Ganley et al. (2019) measured time in view rising
+#' with distance for their aircraft, at about 0.03 s per metre. A window
+#' measured in the field, as they did by timing a buoy through the field of
+#' view, is better than any of these formulas.
 #'
-#' Ganley et al. (2019) measured it for the Skymaster flown over Cape Cod Bay
-#' and found time in view rising from about 50 s near the trackline to about
-#' 130 s at 3 km, a slope of roughly 0.03 s per metre. Use
-#' [view_window_aerial()] there. This function is for a genuinely circular view,
-#' and is kept because that case exists — not because it is the default worth
-#' reaching for.
+#' @param radius Numeric. Radius of the viewing area, in metres. Must be
+#'   positive.
+#' @param speed Numeric. Platform ground speed, in metres per second. Must be
+#'   positive.
+#' @param distance Numeric. Perpendicular distance, in metres. Default `0`, the
+#'   trackline, which gives the widest window. Must not be negative.
 #'
-#' Measuring the window, as Ganley et al. did by timing a navigation buoy
-#' through the field of view, beats deriving it from either formula.
-#'
-#' @param radius Radius of the viewing area, in metres.
-#' @param speed Platform ground speed, in metres per second.
-#' @param distance Perpendicular distance, in metres. `0` (default) is on the
-#'   trackline, which gives the widest window.
-#'
-#' @return A numeric vector of window durations in seconds, `0` where `distance`
-#'   exceeds `radius`.
+#' @return A numeric vector of windows in seconds, `0` where `distance` exceeds
+#'   `radius`.
 #'
 #' @references
 #' Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there
 #' is: estimating North Atlantic right whale *Eubalaena glacialis* local
 #' abundance. *Endangered Species Research* 38:101-113.
-#' \doi{10.3354/esr00938} Time in view measured for an aerial platform, and why
-#' it rises rather than falls with perpendicular distance.
+#' \doi{10.3354/esr00938} Time in view measured for an aircraft, rising with
+#' perpendicular distance.
 #'
-#' @seealso [view_window_aerial()] for an aircraft's forward-and-aft field of
-#'   view, which is the usual case here, and [view_window_vessel()] for a ship's
-#'   forward search arc. [availability()] for what the window feeds.
+#' @seealso [view_window_aerial()] for an aircraft, [view_window_vessel()] for
+#'   a ship, and [availability()] for what the window feeds.
 #'
 #' @examples
 #' # A 300 m viewing radius at 50 m/s, on the trackline
 #' view_window(radius = 300, speed = 50)
 #'
-#' # The window narrows away from the trackline, and closes at the edge
+#' # The window narrows away from the trackline and is 0 beyond the radius
 #' view_window(radius = 300, speed = 50, distance = c(0, 150, 290, 400))
 #'
 #' @export
 view_window <- function(radius, speed, distance = 0) {
+  # Check inputs.
   stopifnot(is.numeric(radius), is.numeric(speed), is.numeric(distance))
   if (any(!is.na(radius) & radius <= 0)) {
     rlang::abort("`radius` must be positive.")
@@ -283,52 +298,60 @@ view_window <- function(radius, speed, distance = 0) {
     rlang::abort("`distance` is a perpendicular distance and cannot be negative.")
   }
 
+  # Chord length divided by speed. Outside the radius the chord is zero.
   half_chord <- sqrt(pmax(radius^2 - distance^2, 0))
   2 * half_chord / speed
 }
 
 
-#' The time an animal stays in view of an aircraft
+#' Time in view for an aircraft
 #'
-#' The window [availability()] needs, for an observer looking through a side
-#' window of an aircraft: a field of view running forward and aft, rather than a
-#' circular patch.
+#' Computes the `window` for [availability()] for an observer looking through
+#' the side window of an aircraft. The field of view is a wedge running forward
+#' and aft of perpendicular, so time in view grows with perpendicular distance.
+#' This is the usual geometry for an aerial line-transect survey.
 #'
-#' @section Why this grows with distance:
-#' The field of view is an angular wedge. An animal further off the trackline
-#' sits inside that wedge for **longer**, because the wedge is wider out there.
-#' This is the opposite of [view_window()]'s circular geometry, and it is the
-#' case that applies to a line-transect aerial survey.
+#' @section How it works:
+#' Following the linear form fitted by Ganley et al. (2019), for a time in view
+#' \eqn{\alpha} at the trackline, a viewing half-angle \eqn{\theta} forward of
+#' perpendicular and the same aft, and ground speed \eqn{v}:
 #'
-#' Following Ganley et al. (2019), for a time in view \eqn{\alpha} at the
-#' trackline, a viewing half-angle \eqn{\theta} forward and aft, and ground
-#' speed \eqn{v}:
+#' \deqn{t(x) = \alpha + \frac{2 x \tan\theta}{v}}
 #'
-#' \deqn{t(x) = \alpha + \frac{x \tan\theta}{v}}
+#' A point at perpendicular distance \eqn{x} enters the wedge \eqn{x \tan\theta}
+#' ahead of abeam and leaves \eqn{x \tan\theta} behind, so it is in view for an
+#' extra \eqn{2 x \tan\theta} of track.
 #'
-#' @section Calibrating it, rather than deriving it:
-#' Ganley et al. (2019) obtained \eqn{\alpha} and \eqn{\theta} by flying
-#' transects past a navigation buoy and timing it through the field of view,
-#' which is worth far more than a derivation from window dimensions. For the
-#' Cessna Skymaster over Cape Cod Bay, at 185 km/h and 228 or 304 m altitude,
-#' they found time in view at the effective trackline to be **51.22 s**, and a
-#' slope of about 0.03 s per metre of perpendicular distance. Altitude made no
-#' detectable difference across the two they flew.
+#' 1. Exactly one of `angle` and `slope` must be given.
+#' 2. If `angle` is given, the slope is computed as
+#'    \eqn{2 \tan\theta / v} seconds per metre.
+#' 3. The window is `trackline + distance * slope`.
 #'
-#' Their trackline is at 100 m rather than 0 m, because the aircraft's flat
-#' windows leave a blind spot directly beneath it — the same blind spot that
-#' `sweep_models(left = )` and the gamma key handle at the fitting end. Their
-#' surveys were left-truncated at 100 m for exactly that reason.
+#' @section Calibrating the inputs:
+#' Measured values are better than derived ones. Ganley et al. (2019) flew past
+#' a navigation buoy and timed it through the field of view. For a Cessna
+#' Skymaster at 185 km/h and 228 or 304 m altitude, they found 51.22 s in view
+#' at the effective trackline and a slope of about 0.03 s per metre. The two
+#' altitudes did not differ detectably.
 #'
-#' @param trackline Time in view at the trackline, in seconds — \eqn{\alpha}.
-#' @param speed Ground speed, in metres per second.
-#' @param angle Viewing half-angle forward and aft, in **degrees** from
-#'   perpendicular. Give this or `slope`, not both.
-#' @param slope Seconds of view gained per metre of perpendicular distance,
-#'   \eqn{\tan\theta / v}, if it was calibrated directly. Give this or `angle`.
-#' @param distance Perpendicular distance, in metres.
+#' Their effective trackline is at 100 m, not 0 m, because the aircraft's flat
+#' windows leave a blind spot beneath it; their data were left-truncated at
+#' 100 m for that reason. At the fitting end the same blind spot is handled by
+#' `sweep_models(left = )` or the gamma key.
 #'
-#' @return A numeric vector of window durations in seconds.
+#' @param trackline Numeric. Time in view at the trackline, \eqn{\alpha}, in
+#'   seconds. Must not be negative.
+#' @param speed Numeric. Ground speed, in metres per second. Must be positive.
+#' @param angle Numeric or `NULL` (default). Viewing half-angle \eqn{\theta}, in
+#'   degrees from perpendicular: the view runs `angle` forward and `angle` aft.
+#'   Must be above 0 and below 90. Give this or `slope`, not both.
+#' @param slope Numeric or `NULL` (default). Seconds in view gained per metre
+#'   of perpendicular distance, \eqn{2 \tan\theta / v}, if calibrated directly.
+#'   Must not be negative. Give this or `angle`, not both.
+#' @param distance Numeric. Perpendicular distance, in metres. Default `0`.
+#'   Must not be negative.
+#'
+#' @return A numeric vector of windows in seconds.
 #'
 #' @references
 #' Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what there
@@ -341,17 +364,18 @@ view_window <- function(radius, speed, distance = 0) {
 #'
 #' @examples
 #' # Ganley et al.'s Skymaster, calibrated directly: 51.22 s at the trackline,
-#' # gaining about 0.03 s per metre out
+#' # plus about 0.03 s per metre
 #' view_window_aerial(trackline = 51.22, speed = 51.4, slope = 0.03,
 #'                    distance = c(0, 1000, 3000))
 #'
-#' # The same thing from a viewing half-angle
-#' view_window_aerial(trackline = 51.22, speed = 51.4, angle = 57,
+#' # The same from a half-angle: 2 * tan(37.6 deg) / 51.4 is about 0.03 s/m
+#' view_window_aerial(trackline = 51.22, speed = 51.4, angle = 37.6,
 #'                    distance = c(0, 1000, 3000))
 #'
 #' @export
 view_window_aerial <- function(trackline, speed, angle = NULL, slope = NULL,
                                distance = 0) {
+  # Check inputs: exactly one of angle and slope, and valid ranges.
   stopifnot(is.numeric(trackline), is.numeric(speed), is.numeric(distance))
   if (is.null(angle) == is.null(slope)) {
     rlang::abort(paste0(
@@ -369,6 +393,7 @@ view_window_aerial <- function(trackline, speed, angle = NULL, slope = NULL,
     rlang::abort("`distance` is a perpendicular distance and cannot be negative.")
   }
 
+  # Get the slope in seconds per metre, from the angle or as given.
   if (is.null(slope)) {
     if (any(!is.na(angle) & (angle <= 0 | angle >= 90))) {
       rlang::abort(paste0(
@@ -376,7 +401,9 @@ view_window_aerial <- function(trackline, speed, angle = NULL, slope = NULL,
         "between 0 and 90. At 90 the field of view never closes."
       ))
     }
-    slope <- tan(angle * pi / 180) / speed
+    # The wedge runs forward and aft, so a point at distance x is in view for
+    # 2 * x * tan(angle) of track.
+    slope <- 2 * tan(angle * pi / 180) / speed
   } else if (any(!is.na(slope) & slope < 0)) {
     rlang::abort(paste0(
       "`slope` cannot be negative: an aircraft's field of view widens with ",
@@ -385,68 +412,65 @@ view_window_aerial <- function(trackline, speed, angle = NULL, slope = NULL,
     ))
   }
 
+  # Linear in distance.
   trackline + distance * slope
 }
 
 
-#' The time an animal stays in view of a vessel
+#' Time in view for a vessel
 #'
-#' The window [availability()] needs, for observers searching a forward arc from
-#' a ship: a sector ahead of the bow, which a point on the water enters when it
-#' comes inside the search angle and leaves when it draws abeam.
+#' Computes the `window` for [availability()] for observers on a ship who
+#' search a sector ahead of the bow. The window runs from the moment the animal
+#' crosses the search radius to the moment its bearing passes the edge of the
+#' search angle (abeam, for a full forward search).
 #'
-#' @section Why a ship is neither of the other two:
-#' [view_window()] is a circular patch, watched fore and aft alike, so its
-#' window is the full chord. [view_window_aerial()] is a wedge through a side
-#' window, so its window *grows* with perpendicular distance. A shipboard
-#' observer does neither: the search is **forward only**. Behind the beam there
-#' is nothing to see that has not already been counted, and a survey that
-#' counted it would be counting the same animal twice.
+#' @section Which platform this fits:
+#' A ship's observers search forward only. An animal behind the beam has
+#' already been passed, and counting it would count it twice. This differs
+#' from [view_window()], which watches a full circle, and from
+#' [view_window_aerial()], whose window grows with perpendicular distance.
 #'
-#' So the window runs from the moment the animal enters the searched sector to
-#' the moment it draws abeam, and no further. For a search radius \eqn{r}, a
-#' search half-angle \eqn{\theta} measured from the bow, a speed \eqn{v} and a
-#' perpendicular distance \eqn{x}:
+#' @section How it works:
+#' For a search radius \eqn{r}, a search half-angle \eqn{\theta} measured from
+#' the bow, speed \eqn{v} and perpendicular distance \eqn{x}:
 #'
 #' \deqn{w(x) = \frac{\sqrt{r^2 - x^2} - x/\tan\theta}{v}}
 #'
-#' The first term is where the animal crosses the radius; the second is where it
-#' crosses the edge of the search angle. Whichever it meets later is where the
-#' window opens, so the window is zero when the second exceeds the first — an
-#' animal too far off the bow to be searched before it passes.
+#' 1. The animal crosses the search radius when it is \eqn{\sqrt{r^2 - x^2}}
+#'    ahead of the vessel (zero if \eqn{x > r}).
+#' 2. Its bearing passes the edge of the search angle when it is
+#'    \eqn{x/\tan\theta} ahead. At `angle = 90` this is set to exactly zero
+#'    (abeam).
+#' 3. The window is the track between the two, divided by speed, and `0` when
+#'    the second point is further ahead than the first.
 #'
-#' At `angle = 90` the sector is the full forward half-disc, \eqn{x/\tan\theta}
-#' is zero, and the window is exactly **half** [view_window()]'s: same chord,
-#' half of it aft of the beam and never searched.
+#' At `angle = 90` the window is exactly half of [view_window()]'s: the same
+#' chord, with the aft half never searched.
 #'
-#' @section Calibrating it, rather than deriving it:
-#' The same caution applies as for an aircraft. `radius` is an *effective*
-#' search radius — how far the observers were actually detecting, not how far
-#' the big-eyes reach — and it is worth measuring rather than assuming. A
-#' truncation distance from the fitted detection function is a better starting
-#' point than a nominal one.
+#' @section Calibrating the inputs:
+#' `radius` is the effective search radius, the distance at which observers
+#' actually detected animals, not the reach of the binoculars. A truncation
+#' distance from the fitted detection function is a better starting point than
+#' a nominal one. This window does not correct for animals moving toward or
+#' away from the ship before detection; that is not an availability problem.
+#' See [g0()] for how components combine.
 #'
-#' Nothing here corrects for a ship's own effect on the animals. Vessel
-#' avoidance and attraction both move animals before they are counted, and
-#' neither is an availability problem: availability asks whether an animal that
-#' was there surfaced in time to be seen. See [g0()] for where the components
-#' combine.
+#' @param radius Numeric. Effective search radius ahead of the vessel, in
+#'   metres. Must be positive.
+#' @param speed Numeric. Vessel speed over ground, in metres per second. Must be
+#'   positive.
+#' @param angle Numeric. Search half-angle from the bow, in degrees. Default
+#'   `90`, a full beam-to-beam forward search. Must be above 0 and at most 90.
+#' @param distance Numeric. Perpendicular distance, in metres. Default `0`, the
+#'   trackline, which gives the widest window. Must not be negative.
 #'
-#' @param radius Effective search radius ahead of the vessel, in metres.
-#' @param speed Vessel speed over ground, in metres per second.
-#' @param angle Search half-angle from the bow, in **degrees**. `90` (default)
-#'   is a full beam-to-beam forward search; a narrower arc is narrower.
-#' @param distance Perpendicular distance, in metres. `0` (default) is on the
-#'   trackline, which gives the widest window.
-#'
-#' @return A numeric vector of window durations in seconds, `0` where the animal
-#'   is never inside the searched sector.
+#' @return A numeric vector of windows in seconds, `0` where the animal is never
+#'   inside the searched sector. `view_window_ship()` is an alias.
 #'
 #' @references
 #' Buckland, S.T., Anderson, D.R., Burnham, K.P., Laake, J.L., Borchers, D.L.
 #' and Thomas, L. (2001) *Introduction to Distance Sampling.* Oxford University
-#' Press. Shipboard line transect search geometry, and why the search is
-#' forward of the beam.
+#' Press. Shipboard search geometry, forward of the beam.
 #'
 #' Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997) Probability
 #' of detecting harbor porpoise from aerial surveys: estimating g(0). *The
@@ -454,27 +478,26 @@ view_window_aerial <- function(trackline, speed, angle = NULL, slope = NULL,
 #' availability formula this window feeds.
 #'
 #' @seealso [availability()] for what the window feeds, [view_window_aerial()]
-#'   for an aircraft's forward-and-aft wedge, and [view_window()] for a
-#'   circular patch.
+#'   for an aircraft, and [view_window()] for a circular area.
 #'
 #' @examples
 #' # A 6 km effective search radius at 10 knots (5.1 m/s), on the trackline
 #' view_window_vessel(radius = 6000, speed = 5.1)
 #'
-#' # The window closes as the animal approaches the edge of the sector
+#' # The window shrinks with perpendicular distance and is 0 beyond the radius
 #' view_window_vessel(radius = 6000, speed = 5.1,
 #'                    distance = c(0, 2000, 5000, 7000))
 #'
-#' # A narrower search arc loses the animals furthest off the bow first
+#' # A narrower search arc shortens the window more at larger distances
 #' view_window_vessel(radius = 6000, speed = 5.1, angle = 45,
 #'                    distance = c(0, 2000, 5000))
 #'
-#' # A full forward search is half a circular patch: the aft half is never
-#' # searched
+#' # A full forward search gives half the circular window
 #' view_window_vessel(radius = 300, speed = 50) == view_window(300, 50) / 2
 #'
 #' @export
 view_window_vessel <- function(radius, speed, angle = 90, distance = 0) {
+  # Check inputs.
   stopifnot(is.numeric(radius), is.numeric(speed), is.numeric(distance),
             is.numeric(angle))
   if (any(!is.na(radius) & radius <= 0)) {
@@ -498,15 +521,24 @@ view_window_vessel <- function(radius, speed, angle = 90, distance = 0) {
     ))
   }
 
-  # Where the animal enters the radius, and where it enters the search arc.
-  # The window opens at whichever it meets later, which is why this is a
-  # difference and not a minimum.
-  enters_radius <- sqrt(pmax(radius^2 - distance^2, 0))
-  # tan(90 degrees) is not exactly infinite in floating point, so pin the
-  # full-forward case to an exact zero rather than to something near it.
-  enters_arc <- ifelse(angle == 90, 0, distance / tan(angle * pi / 180))
+  # Recycle angle and distance to a common length so the subsetting below
+  # pairs them element by element.
+  n <- max(length(radius), length(speed), length(angle), length(distance))
+  angle <- rep_len(angle, n)
+  distance <- rep_len(distance, n)
 
-  pmax(enters_radius - enters_arc, 0) / speed
+  # Distance ahead at which the animal crosses the search radius.
+  enters_radius <- sqrt(pmax(radius^2 - distance^2, 0))
+
+  # Distance ahead at which its bearing passes the edge of the search angle.
+  # tan(90 degrees) is not exactly infinite in floating point, so the
+  # full-forward case is set to exactly zero. Subsetting rather than ifelse()
+  # keeps each angle paired with its own distance.
+  leaves_arc <- distance / tan(angle * pi / 180)
+  leaves_arc[angle == 90] <- 0
+
+  # Track between the two points, as time.
+  pmax(enters_radius - leaves_arc, 0) / speed
 }
 
 
@@ -515,9 +547,26 @@ view_window_vessel <- function(radius, speed, angle = 90, distance = 0) {
 view_window_ship <- view_window_vessel
 
 
-# a = (s + d(1 - exp(-w/d))) / (s + d), Laake et al. (1997) equation 5 as
-# written out by Ganley et al. (2019).
-# `par` is c(surface, dive) so that numDeriv can differentiate it as a vector.
+# Check that each argument has length 1 or `n` before it is recycled.
+# Input: a named list of arguments and the target length `n`. Returns nothing;
+# aborts naming the offending arguments, reported from the caller's frame.
+# rep_len() alone would stretch a length-2 vector over 3 rows and pair values
+# with rows they were never meant for.
+check_recycle <- function(args, n, call = rlang::caller_env()) {
+  bad <- names(args)[!lengths(args) %in% c(1L, n)]
+  if (length(bad)) {
+    rlang::abort(paste0(
+      "Lengths must be 1 or ", n, ": ",
+      paste0("`", bad, "` has ", lengths(args)[bad], collapse = ", "), "."
+    ), call = call)
+  }
+}
+
+# Availability for one element: a = (s + d(1 - exp(-w/d))) / (s + d), from
+# Laake et al. (1997) as written out by Ganley et al. (2019).
+# Input: `par` = c(surface, dive) in seconds, and `window` in seconds.
+# Returns a single number, or NA if any input is NA.
+# `par` is a vector so that numDeriv::grad() can differentiate it.
 availability_one <- function(par, window) {
   s <- par[[1]]
   d <- par[[2]]
@@ -525,18 +574,23 @@ availability_one <- function(par, window) {
   (s + d * (1 - exp(-window / d))) / (s + d)
 }
 
-# Delta method: the Jacobian with respect to (surface, dive), combined with
-# their covariance matrix. Numerical rather than hand-derived, matching how
-# effect_estimates_ddf() handles the same problem.
+# Delta-method standard error of availability for one element.
+# Input: `par` = c(surface, dive), `window`, and `vcov`, the 2 x 2 covariance
+# matrix of (surface, dive). Returns a single number, or NA if any input is NA
+# or the computation fails.
+# The gradient is numerical rather than hand-derived, as in
+# effect_estimates_ddf().
 availability_se <- function(par, window, vcov) {
   if (anyNA(par) || is.na(window) || anyNA(vcov)) return(NA_real_)
 
+  # Gradient of availability with respect to (surface, dive).
   g <- try(
     numDeriv::grad(availability_one, par, window = window),
     silent = TRUE
   )
   if (inherits(g, "try-error") || anyNA(g)) return(NA_real_)
 
+  # Variance = g' V g; return its square root if it is valid.
   v <- drop(t(g) %*% vcov %*% g)
   if (is.na(v) || v < 0) return(NA_real_)
   sqrt(v)
