@@ -53,6 +53,14 @@
 #' to a model set that contains the gamma key accounts for the blind spot twice,
 #' and warns.
 #'
+#' @section Adjustment terms are fitted monotone:
+#' As in `Distance::ds()`, a candidate with adjustment terms and no covariates
+#' is fitted with a strict monotonicity constraint (`mono = TRUE,
+#' mono.strict = TRUE` in `mrds`), so g(x) does not rise above 1 or turn back
+#' upward. The AIC and `p` then match `ds()` fitted with its defaults. Covariate
+#' models are unconstrained, as `ds()` leaves them, and so is the gamma key,
+#' which rises to a peak by design.
+#'
 #' @section This does not estimate g(0):
 #' Every fit here conditions on the animal having been available and seen. For a
 #' deep-diving species that assumption biases density low, and no amount of
@@ -104,13 +112,15 @@ sweep_models <- function(data, models = NULL, truncation, left = NULL,
                          breaks = NULL, quiet = FALSE) {
   check_mrds()
   if (is.null(models)) models <- model_set()
+  check_model_set(models)
   if (missing(truncation)) {
     rlang::abort(paste0(
       "`truncation` is required. It defines the data every model in the sweep ",
       "is fitted to, and AIC only compares models fitted to the same data."
     ))
   }
-  stopifnot(is.numeric(truncation), length(truncation) == 1L, truncation > 0)
+  stopifnot(is.numeric(truncation), length(truncation) == 1L,
+            is.finite(truncation), truncation > 0)
 
   prepared <- prepare_distance_data(data, truncation = truncation, left = left,
                                     breaks = breaks)
@@ -140,13 +150,13 @@ sweep_models <- function(data, models = NULL, truncation, left = NULL,
         dsmodel = stats::as.formula(models$dsmodel[i]),
         data = prepared$data,
         method = "ds",
-        meta.data = meta
+        meta.data = c(meta, monotonicity(models[i, , drop = FALSE]))
       ),
       silent = TRUE
     )
     if (inherits(fit, "try-error")) {
       failures <- c(failures, stats::setNames(
-        sub("\n.*", "", conditionMessage(attr(fit, "condition"))),
+        first_line(conditionMessage(attr(fit, "condition"))),
         models$model_id[i]
       ))
       # `fits[[i]] <- NULL` would delete the element rather than empty it,
@@ -189,8 +199,9 @@ sweep_models <- function(data, models = NULL, truncation, left = NULL,
 #'
 #' @return A tibble, sorted by AIC, with `model_id`, `key`, `adjustment`,
 #'   `order`, `formula`, `converged`, `n_par`, `aic`, `delta_aic`, `p`, `p_se`,
-#'   `p_cv`, `esw`, and a goodness-of-fit p-value in `cvm_p` (exact distances)
-#'   or `chisq_p` (binned).
+#'   `p_cv`, `esw`, `cvm_p` and `chisq_p`. Both goodness-of-fit columns are
+#'   always present: `cvm_p` is `NA` for binned distances, and `chisq_p` is
+#'   the one to read there.
 #'
 #' @seealso [sweep_models()]
 #'
@@ -329,6 +340,39 @@ report_sweep <- function(x) {
   }
   lines <- c(lines, "  g(0) = 1 is assumed; see `?sweep_models`.")
   rlang::inform(paste(lines, collapse = "\n"))
+}
+
+# The monotonicity constraint Distance::ds() applies by default: strict for a
+# model with adjustment terms and no covariates, none otherwise. Adjustment
+# terms can otherwise bend g(x) above 1 or back upward, and the AIC and p
+# then differ from the same model fitted through Distance. A key alone is
+# monotone already. The gamma key is excluded: it rises to a peak by design.
+monotonicity <- function(model) {
+  constrain <- !is.na(model$adjustment) && model$key != "gamma" &&
+    identical(trimws(model$formula), "~1")
+  list(mono = constrain, mono.strict = constrain)
+}
+
+# The first non-empty line of an mrds error. Some begin with a newline, which
+# keeping only the text before it would reduce to "".
+first_line <- function(msg) {
+  lines <- trimws(strsplit(msg, "\n")[[1]])
+  lines <- lines[nzchar(lines)]
+  if (length(lines)) lines[1] else msg
+}
+
+# A model set is the tibble model_set() returns. Anything else fails later
+# with an error that does not name the argument.
+check_model_set <- function(models, call = rlang::caller_env()) {
+  need <- c("model_id", "key", "adjustment", "order", "formula", "dsmodel")
+  if (!is.data.frame(models) || !all(need %in% names(models))) {
+    rlang::abort("`models` must be a model set built by `model_set()`.",
+                 call = call)
+  }
+  if (!nrow(models)) {
+    rlang::abort("`models` has no candidates.", call = call)
+  }
+  invisible(models)
 }
 
 check_mrds <- function(call = rlang::caller_env()) {

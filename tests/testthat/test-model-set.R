@@ -116,3 +116,20 @@ test_that("model ids are unique and readable", {
   expect_equal(anyDuplicated(ms$model_id), 0L)
   expect_true(all(nchar(ms$model_id) > 0))
 })
+
+test_that("duplicate candidates are dropped, with a reason", {
+  expect_warning(ms <- model_set(key = c("hn", "hn"), formula = list(~1, ~1)),
+                 "duplicate candidate\\(s\\): hn")
+  expect_equal(ms$model_id, "hn")
+  expect_warning(model_set("hn", "cos", order = c(2, 2)), "hn\\+cos\\(2\\)")
+})
+
+test_that("two-sided formulas are refused", {
+  expect_error(model_set("hn", formula = distance ~ x), "one-sided")
+})
+
+test_that("factor keys and adjustments come out as character", {
+  ms <- model_set(key = factor(c("hn", "hr")), adjustment = factor("cos"))
+  expect_type(ms$key, "character")
+  expect_type(ms$adjustment, "character")
+})

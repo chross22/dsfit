@@ -143,3 +143,78 @@ test_that("ordinary distance sources pass without comment", {
   d <- with_sources(c(rep("angle", 5), rep("exact", 5)))
   expect_silent(prepare_distance_data(d, truncation = 400))
 })
+
+binned_with_empty_distance <- function() {
+  d <- binned_data()
+  d$distance <- NA_real_
+  d
+}
+
+test_that("a binned flatfile with an all-NA distance column is fitted binned", {
+  # The flatfile shape: all three columns present. mrds read the NA column as
+  # the distances and had "no data to analyze" for every candidate.
+  d <- binned_with_empty_distance()
+  p <- prepare_distance_data(d, truncation = max(d$distend))
+  expect_true(p$binned)
+  expect_false("distance" %in% names(p$data))
+})
+
+test_that("empty bin columns on exact data are dropped", {
+  d <- exact_data()
+  d$distbegin <- NA_real_
+  d$distend <- NA_real_
+  p <- prepare_distance_data(d, truncation = 400)
+  expect_false(any(c("distbegin", "distend") %in% names(p$data)))
+})
+
+test_that("distances must be numeric and not negative", {
+  d <- data.frame(object = 1:4, distance = c("50", "120", "500", "30"))
+  expect_error(prepare_distance_data(d, truncation = 400), "must be numeric")
+  d$distance <- factor(d$distance)
+  expect_error(prepare_distance_data(d, truncation = 400), "as.character")
+  d$distance <- c(-50, 120, 300, 30)
+  expect_error(prepare_distance_data(d, truncation = 400), "1 negative")
+})
+
+test_that("truncation must be finite", {
+  expect_error(prepare_distance_data(exact_data(), truncation = Inf))
+})
+
+test_that("duplicated object IDs are refused before mrds sees them", {
+  d <- exact_data()
+  d$object[1:3] <- 1L
+  expect_error(prepare_distance_data(d, truncation = 400), "1 value\\(s\\) repeat")
+})
+
+test_that("the no-distances message says what is actually wrong", {
+  expect_error(prepare_distance_data(exact_data()[0, ], truncation = 400),
+               "no rows")
+  expect_error(prepare_distance_data(data.frame(object = 1:3, distance = NA),
+                                     truncation = 400),
+               "every value is missing")
+})
+
+test_that("bins converted between units still tile", {
+  d <- data.frame(object = 1:4, distbegin = c(0, .1, .1 * 3, .3),
+                  distend = c(.1, .1 * 3, .6, .6))
+  p <- prepare_distance_data(d, truncation = .6)
+  expect_equal(length(p$breaks), 4)
+})
+
+test_that("supplied breaks must be sorted and contain the recorded bins", {
+  d <- data.frame(object = 1:6, distbegin = rep(c(0, 100, 200), 2),
+                  distend = rep(c(100, 200, 300), 2))
+  expect_error(prepare_distance_data(d, truncation = 300,
+                                     breaks = c(300, 0, 100, 200)),
+               "strictly increasing")
+  expect_error(prepare_distance_data(d, truncation = 300,
+                                     breaks = c(0, 150, 300)),
+               "does not contain the bin edge\\(s\\) 100, 200")
+  expect_silent(prepare_distance_data(d, truncation = 300,
+                                      breaks = c(0, 100, 200, 300)))
+})
+
+test_that("breaks given with exact distances are ignored, with a warning", {
+  expect_warning(prepare_distance_data(exact_data(), truncation = 400,
+                                       breaks = c(0, 200, 400)), "ignored")
+})

@@ -5,8 +5,8 @@
 #'
 #' @section These numbers are invented:
 #' They are not measurements. In particular they are **not** Ganley et al.
-#' (2019)'s Cape Cod Bay values, which are not open access. Do not use them to
-#' correct anything.
+#' (2019)'s Cape Cod Bay values, which ship separately as
+#' [ganley_availability]. Do not use them to correct anything.
 #'
 #' What is real is the pattern they were built to show. Ganley et al. (2019)
 #' found right whale availability in Cape Cod Bay varying by month between
@@ -141,8 +141,8 @@
 #' ganley_availability
 #'
 #' # The measured seasonal swing, as a g(0) component. A standard error has to
-#' # be decided on first - see above on the variance column - so this uses a
-#' # deliberately explicit placeholder rather than a silent conversion.
+#' # be decided on first - see above on the variance column. This takes the
+#' # literal reading, the column as a variance; decide before relying on it.
 #' avail <- data.frame(
 #'   key = as.character(ganley_availability$month),
 #'   component = "availability",

@@ -95,7 +95,7 @@ test_that("covariance between the interval means is carried", {
                              cov_surface_dive = 150)$se
   # The two partial derivatives have opposite signs, so a positive covariance
   # reduces the variance of the result rather than inflating it.
-  expect_false(isTRUE(all.equal(indep, correlated)))
+  expect_lt(correlated, indep)
 })
 
 test_that("impossible intervals are refused", {
@@ -184,13 +184,25 @@ test_that("the aerial window reproduces Ganley et al.'s measured platform", {
 
 test_that("a half-angle and a calibrated slope are two routes to one window", {
   speed <- 51.4
-  angle <- 57
+  angle <- 37.6
   by_angle <- view_window_aerial(trackline = 51.22, speed = speed,
                                  angle = angle, distance = 1000)
   by_slope <- view_window_aerial(trackline = 51.22, speed = speed,
-                                 slope = tan(angle * pi / 180) / speed,
+                                 slope = 2 * tan(angle * pi / 180) / speed,
                                  distance = 1000)
   expect_equal(by_angle, by_slope)
+})
+
+test_that("the wedge is crossed forward and aft", {
+  # A point x off the line enters x * tan(angle) ahead of abeam and leaves the
+  # same distance behind: 2 * x * tan(angle) of track. At 45 degrees, 100 m
+  # off and 1 m/s, that is 200 s beyond the trackline time.
+  expect_equal(view_window_aerial(trackline = 0, speed = 1, angle = 45,
+                                  distance = 100), 200)
+  # Ganley et al.'s measured 0.03 s per metre at 51.4 m/s is a half-angle of
+  # about 37.6 degrees.
+  expect_equal(view_window_aerial(0, 51.4, angle = 37.6, distance = 1),
+               0.03, tolerance = 0.002)
 })
 
 test_that("the aerial window refuses what it cannot mean", {
@@ -367,4 +379,27 @@ test_that("a vessel's window feeds availability the same way", {
     window = view_window_vessel(r, v, distance = 5000)
   )$value
   expect_lt(off_line, on_line)
+})
+
+test_that("the vessel window is computed per distance on a narrowed arc", {
+  # ifelse() took its length from `angle`, so every distance after the first
+  # reused the first one's arc term.
+  d <- c(0, 100, 200, 500)
+  vec <- view_window_vessel(1000, 5, angle = 45, distance = d)
+  one <- vapply(d, function(x) view_window_vessel(1000, 5, angle = 45,
+                                                  distance = x), numeric(1))
+  expect_equal(vec, one)
+  expect_equal(round(vec, 1), c(200, 179, 156, 73.2))
+  # Order does not matter.
+  expect_equal(view_window_vessel(1000, 5, angle = 45, distance = rev(d)),
+               rev(one))
+})
+
+test_that("lengths that do not recycle evenly are refused", {
+  expect_error(availability(surface = c(60, 70), dive = c(240, 250, 260),
+                            window = 24), "Lengths must be 1 or 3")
+  expect_error(availability(60, 240, 24, se_surface = c(8, 9), se_dive = 25),
+               "`se_surface` has 2")
+  expect_no_error(availability(c(60, 70), 240, 24, se_surface = c(8, 9),
+                               se_dive = 25, key = c("a", "b")))
 })

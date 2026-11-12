@@ -62,7 +62,8 @@ test_that("components must be named", {
 test_that("impossible component values are refused", {
   expect_error(suppressWarnings(g0(avail(1.2, 0.04))), "must be in \\(0, 1\\]")
   expect_error(suppressWarnings(g0(avail(0, 0.04))), "must be in \\(0, 1\\]")
-  expect_error(suppressWarnings(g0(avail(0.5, -1))), "cannot be negative")
+  expect_error(suppressWarnings(g0(avail(0.5, -1))), "not negative")
+  expect_error(suppressWarnings(g0(avail(0.5, Inf))), "must be finite")
   # Certain detection is a legitimate value, if an unusual one.
   expect_equal(suppressWarnings(g0(avail(1, 0.0)))$table$value, 1)
 })
@@ -195,4 +196,21 @@ test_that("availability() feeds g0() directly", {
   expect_true(all(g$table$value < a$value))
   # And the combined CV exceeds either component's.
   expect_true(all(g$table$cv > a$se / a$value))
+})
+
+test_that("malformed components are refused with a message naming them", {
+  pc <- data.frame(key = NA, component = "perception", value = 0.7, se = 0.1)
+  av <- availability(60, 240, 24, se_surface = 8, se_dive = 25)
+  expect_error(g0(av, pc[0, ]), "Component 2 has no rows")
+  bad <- pc
+  bad$value <- "0.7"
+  expect_error(g0(av, bad), "must be numeric")
+  bad <- pc
+  bad$key <- ""
+  expect_error(g0(av, bad), "empty `key`")
+})
+
+test_that("several unkeyed rows of one component name the missing key", {
+  av <- availability(c(60, 70), 240, 24, se_surface = 8, se_dive = 25)
+  expect_error(suppressWarnings(g0(av)), "2 rows and no `key`")
 })

@@ -66,11 +66,31 @@
 prepare_distance_data <- function(data, truncation, left = NULL,
                                   breaks = NULL) {
   stopifnot(is.data.frame(data))
-  stopifnot(is.numeric(truncation), length(truncation) == 1L, truncation > 0)
+  stopifnot(is.numeric(truncation), length(truncation) == 1L,
+            is.finite(truncation), truncation > 0)
   if (!is.null(left)) {
-    stopifnot(is.numeric(left), length(left) == 1L, left >= 0)
+    stopifnot(is.numeric(left), length(left) == 1L, is.finite(left), left >= 0)
     if (left >= truncation) {
       rlang::abort("`left` must be smaller than `truncation`.")
+    }
+  }
+
+  # A character or factor distance would be compared as text or as level
+  # codes against the truncation, keeping and dropping the wrong rows.
+  for (col in intersect(c("distance", "distbegin", "distend"), names(data))) {
+    x <- data[[col]]
+    if (!is.numeric(x) && !all(is.na(x))) {
+      rlang::abort(paste0(
+        "`", col, "` must be numeric, not ", class(x)[1], ". Convert it with ",
+        "`as.numeric()` - for a factor, `as.numeric(as.character(x))`."
+      ))
+    }
+    if (is.numeric(x) && any(x < 0, na.rm = TRUE)) {
+      rlang::abort(paste0(
+        "`", col, "` has ", sum(x < 0, na.rm = TRUE), " negative value(s). ",
+        "A perpendicular distance has no side; take `abs()` if a negative ",
+        "sign records which side of the line the animal was on."
+      ))
     }
   }
 
@@ -79,10 +99,14 @@ prepare_distance_data <- function(data, truncation, left = NULL,
     any(!is.na(data$distbegin))
 
   if (!has_point && !has_bin) {
-    rlang::abort(paste0(
-      "No distances found. `data` needs a `distance` column, or `distbegin` ",
-      "and `distend` for binned data."
-    ))
+    rlang::abort(if (!nrow(data)) "`data` has no rows." else
+      if (any(c("distance", "distbegin") %in% names(data))) paste0(
+        "No distances found: the distance columns are present but every ",
+        "value is missing."
+      ) else paste0(
+        "No distances found. `data` needs a `distance` column, or `distbegin` ",
+        "and `distend` for binned data."
+      ))
   }
   if (has_point && has_bin) {
     rlang::abort(paste0(
@@ -136,7 +160,11 @@ prepare_distance_data <- function(data, truncation, left = NULL,
       rlang::abort("No detections left after truncation.")
     }
 
-    if (is.null(breaks)) breaks <- derive_breaks(data)
+    if (is.null(breaks)) {
+      breaks <- derive_breaks(data)
+    } else {
+      check_breaks(breaks, data)
+    }
 
     # A binned fit integrates the detection function over the bins. If the top
     # bin stops short of the truncation width there is a strip of unaccounted
@@ -170,9 +198,23 @@ prepare_distance_data <- function(data, truncation, left = NULL,
       ))
     }
 
+    # An all-NA `distance` column, which a flatfile carries for binned rows,
+    # is read by mrds as the distances and leaves it "no data to analyze".
+    data$distance <- NULL
     return(list(data = ensure_object(data), binned = TRUE, breaks = breaks,
                 n_dropped = n0 - nrow(data), dropped = dropped))
   }
+
+  if (!is.null(breaks)) {
+    rlang::warn(paste0(
+      "`breaks` is ignored: the distances are exact, and only a binned fit ",
+      "uses cutpoints."
+    ))
+  }
+  # Likewise empty bin columns on exact data, which make mrds warn once per
+  # candidate that the data has bins but is not being fitted binned.
+  data$distbegin <- NULL
+  data$distend <- NULL
 
   keep <- !is.na(data$distance) & data$distance <= truncation
   if (!is.null(left)) keep <- keep & data$distance >= left
@@ -231,16 +273,31 @@ check_circling <- function(data) {
   invisible(NULL)
 }
 
+# Two edges that differ only by floating-point error, as bins converted
+# between units do (0.1 * 3 against 0.3).
+near <- function(a, b) abs(a - b) <= 1e-8 * pmax(1, abs(a), abs(b))
+
+# Sorted unique values, with near-equal ones collapsed onto the first.
+unique_near <- function(x) {
+  x <- sort(unique(x))
+  if (length(x) < 2L) return(x)
+  x[c(TRUE, !near(x[-1], x[-length(x)]))]
+}
+
 # Cutpoints implied by the bins present. They have to tile: a gap or an overlap
 # means the intervals do not define a single set of breaks, and deriving one
 # anyway would put detections in the wrong bin.
 derive_breaks <- function(data) {
-  edges <- sort(unique(c(data$distbegin, data$distend)))
-  bins <- unique(data.frame(b = data$distbegin, e = data$distend))
+  edges <- unique_near(c(data$distbegin, data$distend))
+  # Each recorded edge is replaced by its representative in `edges`, so the
+  # same bin written two ways (0.1 * 3 and 0.3) is one bin.
+  snap <- function(v) edges[vapply(v, function(e) which(near(e, edges))[1],
+                                   integer(1))]
+  bins <- unique(data.frame(b = snap(data$distbegin), e = snap(data$distend)))
   bins <- bins[order(bins$b), , drop = FALSE]
 
   if (nrow(bins) > 1) {
-    gaps <- bins$b[-1] != bins$e[-nrow(bins)]
+    gaps <- !near(bins$b[-1], bins$e[-nrow(bins)])
     if (any(gaps)) {
       first_gap <- which(gaps)[1]
       rlang::abort(paste0(
@@ -253,10 +310,41 @@ derive_breaks <- function(data) {
   edges
 }
 
-# mrds keys detections on `object`.
+# Supplied cutpoints must be the bins the distances were recorded in. The
+# likelihood uses each row's own distbegin/distend, but goodness of fit uses
+# `breaks`, so cutpoints that cut across the recorded bins leave AIC unchanged
+# and the chi-square computed over bins nobody surveyed.
+check_breaks <- function(breaks, data) {
+  if (!is.numeric(breaks) || anyNA(breaks) || length(breaks) < 2L ||
+      is.unsorted(breaks, strictly = TRUE)) {
+    rlang::abort("`breaks` must be at least two strictly increasing numbers.")
+  }
+  edges <- unique(c(data$distbegin, data$distend))
+  off <- edges[!vapply(edges, function(e) any(near(e, breaks)), logical(1))]
+  if (length(off)) {
+    rlang::abort(paste0(
+      "`breaks` does not contain the bin edge(s) ",
+      paste(utils::head(sort(off), 5), collapse = ", "),
+      if (length(off) > 5) ", ..." else "", " that the distances were ",
+      "recorded in. Goodness of fit is computed over `breaks`, so they must ",
+      "be the survey's own cutpoints."
+    ))
+  }
+}
+
+# mrds keys detections on `object`, and refuses duplicates with a message that
+# begins with a newline.
 ensure_object <- function(data) {
   if (!"object" %in% names(data)) {
     data$object <- seq_len(nrow(data))
+  }
+  dup <- unique(data$object[duplicated(data$object)])
+  if (length(dup)) {
+    rlang::abort(paste0(
+      "`object` must identify one detection per row; ", length(dup),
+      " value(s) repeat, e.g. ", paste(utils::head(dup, 3), collapse = ", "),
+      ". Drop `object` to have it numbered, or deduplicate the rows."
+    ))
   }
   data
 }

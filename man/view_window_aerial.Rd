@@ -11,11 +11,12 @@ view_window_aerial(trackline, speed, angle = NULL, slope = NULL, distance = 0)
 
 \item{speed}{Ground speed, in metres per second.}
 
-\item{angle}{Viewing half-angle forward and aft, in \strong{degrees} from
-perpendicular. Give this or \code{slope}, not both.}
+\item{angle}{Viewing half-angle, in \strong{degrees} from perpendicular: the
+view runs \code{angle} forward and \code{angle} aft. Give this or \code{slope}, not both.}
 
 \item{slope}{Seconds of view gained per metre of perpendicular distance,
-\eqn{\tan\theta / v}, if it was calibrated directly. Give this or \code{angle}.}
+\eqn{2 \tan\theta / v}, if it was calibrated directly. Give this or
+\code{angle}.}
 
 \item{distance}{Perpendicular distance, in metres.}
 }
@@ -34,11 +35,15 @@ sits inside that wedge for \strong{longer}, because the wedge is wider out there
 This is the opposite of \code{\link[=view_window]{view_window()}}'s circular geometry, and it is the
 case that applies to a line-transect aerial survey.
 
-Following Ganley et al. (2019), for a time in view \eqn{\alpha} at the
-trackline, a viewing half-angle \eqn{\theta} forward and aft, and ground
-speed \eqn{v}:
+Following the linear form Ganley et al. (2019) fitted, for a time in view
+\eqn{\alpha} at the trackline, a viewing half-angle \eqn{\theta} forward and
+the same aft of perpendicular, and ground speed \eqn{v}:
 
-\deqn{t(x) = \alpha + \frac{x \tan\theta}{v}}
+\deqn{t(x) = \alpha + \frac{2 x \tan\theta}{v}}
+
+A point at perpendicular distance \eqn{x} enters the wedge
+\eqn{x \tan\theta} ahead of abeam and leaves the same distance behind, so it
+is in view for \eqn{2 x \tan\theta} of track.
 }
 
 \section{Calibrating it, rather than deriving it}{
@@ -63,8 +68,9 @@ surveys were left-truncated at 100 m for exactly that reason.
 view_window_aerial(trackline = 51.22, speed = 51.4, slope = 0.03,
                    distance = c(0, 1000, 3000))
 
-# The same thing from a viewing half-angle
-view_window_aerial(trackline = 51.22, speed = 51.4, angle = 57,
+# The same thing from a viewing half-angle: 2 * tan(37.6 deg) / 51.4 is
+# about 0.03 s per metre
+view_window_aerial(trackline = 51.22, speed = 51.4, angle = 37.6,
                    distance = c(0, 1000, 3000))
 
 }

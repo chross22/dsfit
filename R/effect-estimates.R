@@ -46,7 +46,8 @@
 #' next to a histogram of those same animals' distances.
 #'
 #' The two coincide when detection probability is constant, and differ by a
-#' fraction of a percent otherwise. `esw` in the selection table uses the
+#' few percent otherwise: 3.5% on the package's own covariate fixture, where
+#' the arithmetic mean is 0.401 and `average.p` is 0.388. `esw` in the selection table uses the
 #' Horvitz-Thompson version, so eyeballing the area under this curve will not
 #' reproduce it exactly for a covariate model.
 #'
@@ -148,8 +149,11 @@ effect_estimates.ddf <- function(model, var = "distance",
   out <- data.frame(
     .x = x,
     .estimate = est,
-    .lower = pmax(0, est - mult * se),
-    .upper = pmin(1, est + mult * se)
+    # Clamped to [0, 1], but never across the estimate: an adjustment model
+    # fitted without a monotonicity constraint can put g(x) above 1, and the
+    # band must still contain the curve it is drawn around.
+    .lower = pmin(est, pmax(0, est - mult * se)),
+    .upper = pmax(est, pmin(1, est + mult * se))
   )
   attr(out, "quantity") <- "Detection probability g(x)"
   out
@@ -186,6 +190,12 @@ effect_estimates_ddf <- function(model, var = "distance",
 averaged_g <- function(ddfobj, x, width) {
   dm <- ddfobj$scale$dm
   shape_dm <- ddfobj$shape$dm
+  # The uniform key has neither: one curve, shared by every detection.
+  if (is.null(dm) && is.null(shape_dm)) {
+    return(function(par) {
+      as.numeric(mrds::detfct(x, mrds::assign.par(ddfobj, par), width = width))
+    })
+  }
   design <- as.data.frame(dm)
   if (!is.null(shape_dm)) design <- cbind(design, as.data.frame(shape_dm))
   key <- do.call(paste, c(unname(design), sep = "\r"))
@@ -198,7 +208,7 @@ averaged_g <- function(ddfobj, x, width) {
   rows <- rep(first, each = n_x)
 
   obj <- ddfobj
-  obj$scale$dm <- dm[rows, , drop = FALSE]
+  if (!is.null(dm)) obj$scale$dm <- dm[rows, , drop = FALSE]
   if (!is.null(shape_dm)) {
     obj$shape$dm <- shape_dm[rows, , drop = FALSE]
   }
@@ -247,12 +257,31 @@ covariate_object <- function(model, at) {
       paste0("`", unknown, "`", collapse = ", "), "."
     ))
   }
-  for (nm in names(at)) dat[[nm]] <- at[[nm]]
+  for (nm in names(at)) dat[[nm]] <- at_value(dat[[nm]], at[[nm]], nm)
 
   form <- ddfobj$scale$formula
   if (is.character(form)) form <- stats::as.formula(form)
   ddfobj$scale$dm <- stats::model.matrix(form, data = dat)
   ddfobj
+}
+
+# A value for `at` in the type of the column it replaces. A factor covariate
+# given as a level ("B") would otherwise become a one-level character column,
+# and model.matrix() refuses it with a message about contrasts. The value is
+# put on the observed levels, so the design matrix has the model's columns.
+at_value <- function(observed, value, name) {
+  if (!is.factor(observed) && !is.character(observed)) return(value)
+  lv <- if (is.factor(observed)) levels(observed) else
+    sort(unique(observed[!is.na(observed)]))
+  bad <- setdiff(as.character(value), lv)
+  if (length(bad)) {
+    rlang::abort(paste0(
+      "`at$", name, "` = ", paste0("\"", bad, "\"", collapse = ", "),
+      " is not a level of `", name, "`. Levels: ",
+      paste0("\"", lv, "\"", collapse = ", "), "."
+    ))
+  }
+  factor(as.character(value), levels = lv)
 }
 
 # Delta method on the fitted parameters. Returns NA with a warning when the

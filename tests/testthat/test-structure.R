@@ -295,3 +295,15 @@ test_that("distance_source is provenance, not a covariate", {
   s <- detection_structure(d)
   expect_false("distance_source" %in% s$summary$covariates)
 })
+
+test_that("column vocabulary is matched without regard to case", {
+  skip_if_not_installed("narwcr")
+  set.seed(1)
+  d <- data.frame(distance = abs(stats::rnorm(100, 0, 100)),
+                  BEAUFORT = sample(0:4, 100, TRUE),
+                  beaufort = sample(0:4, 100, TRUE),
+                  latitude = stats::runif(100), LATITUDE = stats::runif(100))
+  s <- detection_structure(d)
+  expect_false(any(c("latitude", "LATITUDE") %in% s$summary$covariates))
+  expect_equal(length(s$summary$duplicates), 2)
+})

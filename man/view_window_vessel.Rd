@@ -27,7 +27,8 @@ is never inside the searched sector.
 \description{
 The window \code{\link[=availability]{availability()}} needs, for observers searching a forward arc from
 a ship: a sector ahead of the bow, which a point on the water enters when it
-comes inside the search angle and leaves when it draws abeam.
+comes inside the search radius and leaves when its bearing passes the edge
+of the search angle (abeam, for a full forward search).
 }
 \section{Why a ship is neither of the other two}{
 
@@ -39,16 +40,17 @@ is nothing to see that has not already been counted, and a survey that
 counted it would be counting the same animal twice.
 
 So the window runs from the moment the animal enters the searched sector to
-the moment it draws abeam, and no further. For a search radius \eqn{r}, a
+the moment it leaves it, and no further. For a search radius \eqn{r}, a
 search half-angle \eqn{\theta} measured from the bow, a speed \eqn{v} and a
 perpendicular distance \eqn{x}:
 
 \deqn{w(x) = \frac{\sqrt{r^2 - x^2} - x/\tan\theta}{v}}
 
-The first term is where the animal crosses the radius; the second is where it
-crosses the edge of the search angle. Whichever it meets later is where the
-window opens, so the window is zero when the second exceeds the first — an
-animal too far off the bow to be searched before it passes.
+As the vessel approaches, the animal first crosses the search radius, at
+\eqn{\sqrt{r^2 - x^2}} ahead, and later passes the edge of the search angle,
+at \eqn{x/\tan\theta} ahead. The window is the track between the two, and
+zero when the second exceeds the first — an animal too far off the bow to
+be inside both at once.
 
 At \code{angle = 90} the sector is the full forward half-disc, \eqn{x/\tan\theta}
 is zero, and the window is exactly \strong{half} \code{\link[=view_window]{view_window()}}'s: same chord,

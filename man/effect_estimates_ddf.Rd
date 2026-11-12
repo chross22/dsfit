@@ -110,7 +110,8 @@ observed, \eqn{(1/n) \sum g(x \mid z_i)}, which is what you want to look at
 next to a histogram of those same animals' distances.
 
 The two coincide when detection probability is constant, and differ by a
-fraction of a percent otherwise. \code{esw} in the selection table uses the
+few percent otherwise: 3.5\% on the package's own covariate fixture, where
+the arithmetic mean is 0.401 and \code{average.p} is 0.388. \code{esw} in the selection table uses the
 Horvitz-Thompson version, so eyeballing the area under this curve will not
 reproduce it exactly for a covariate model.
 }

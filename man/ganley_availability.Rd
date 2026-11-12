@@ -99,8 +99,8 @@ source.
 ganley_availability
 
 # The measured seasonal swing, as a g(0) component. A standard error has to
-# be decided on first - see above on the variance column - so this uses a
-# deliberately explicit placeholder rather than a silent conversion.
+# be decided on first - see above on the variance column. This takes the
+# literal reading, the column as a variance; decide before relying on it.
 avail <- data.frame(
   key = as.character(ganley_availability$month),
   component = "availability",

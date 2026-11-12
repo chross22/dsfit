@@ -59,7 +59,7 @@ package does not replace it. Two reasons to go a level down for a sweep:
 ## 3. What is built
 
 `model_set()`, `sweep_models()`, `selection_table()`, `prepare_distance_data()`,
-and a `print()` method. 274 tests, six of them snapshots over the selection
+and a `print()` method. The test suite includes six snapshots over the selection
 table.
 
 Left truncation is here too, as `sweep_models(left = )` — the statistically
@@ -95,8 +95,9 @@ The selection table carries, per model: `aic`, `delta_aic`, `n_par`, `p`,
 
 `esw` is there because it is what propagates into density, and two models within
 2 AIC of one another can imply materially different abundance. On the package's
-own example, `hn`, `gamma` and `hr` span 120 to 151 in `esw` — a 26% spread —
-while the top two AICs differ by less than the third's advantage suggests.
+own example, `hn`, `gamma` and `hr` span 120 to 151 in `esw` — a 26% spread.
+`gamma` and `hr` are 0.26 AIC apart (9.92 and 10.18 behind `hn`), and differ
+by 31 in `esw`.
 
 A goodness-of-fit p-value is reported because a model can top the AIC ranking
 and still fail one. Its null is that the fitted function describes the observed
@@ -110,7 +111,7 @@ without knowing its test is worse than no p-value.
 
 Snapshot regression tests over the whole table, which is the requirement that
 made this a package rather than scripts. The sweep *selects* a model; the
-snapshots *pin* the selection, so that an `mrds` or `Distance` upgrade cannot
+snapshots *pin* the selection, so that an `mrds` upgrade cannot
 silently change which model wins. The whole table is pinned rather than the
 winner alone — a swap between models 3 and 4 is the same change arriving early.
 

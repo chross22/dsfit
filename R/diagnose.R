@@ -85,8 +85,12 @@ diagnose_sweep <- function(data, models = NULL, truncation, left = NULL,
     cat("\nStopped: fix the error above before continuing.\n")
     return(invisible(list(structure = NULL)))
   }
-  pass(struct$summary$n, " rows, ", struct$summary$n_distances, " ",
-       struct$summary$type, " distances")
+  if (identical(struct$summary$type, "none")) {
+    fail(struct$summary$n, " rows, and no distances in them")
+  } else {
+    pass(struct$summary$n, " rows, ", struct$summary$n_distances, " ",
+         struct$summary$type, " distances")
+  }
 
   # Ambiguous rather than merely redundant: nothing here can tell which of two
   # columns naming one variable a fit should use.
@@ -154,9 +158,13 @@ diagnose_sweep <- function(data, models = NULL, truncation, left = NULL,
   }
 
   # Losing most of the survey to truncation is legal, and rarely intended.
-  lost <- 1 - n_kept / max(n_in, 1L)
+  # Counted against the rows that have a distance: the rest are a flatfile's
+  # samples with no detection, which truncation never touched.
+  with_distance <- n_in - d[["no_distance"]]
+  lost <- (d[["beyond_truncation"]] + d[["inside_left"]]) /
+    max(with_distance, 1L)
   if (lost > 0.5) {
-    warn("truncation drops ", round(100 * lost), "% of the rows. Buckland et ",
+    warn("truncation drops ", round(100 * lost), "% of the detections. Buckland et ",
          "al. suggest trimming roughly the outer 5%; check `truncation` is in ",
          "the units the distances are in")
   }
@@ -175,7 +183,7 @@ diagnose_sweep <- function(data, models = NULL, truncation, left = NULL,
   # --- The model set ------------------------------------------------------
   header("Model set")
   models <- tryCatch(
-    if (is.null(models)) model_set() else models,
+    if (is.null(models)) model_set() else check_model_set(models),
     error = function(e) {
       fail("could not build the model set: ", conditionMessage(e))
       NULL

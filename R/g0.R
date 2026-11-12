@@ -134,11 +134,25 @@ g0 <- function(...) {
         "Component ", i, " is missing: ", paste(missing, collapse = ", "), "."
       ))
     }
+    if (!nrow(p)) {
+      rlang::abort(paste0("Component ", i, " has no rows."))
+    }
     # `source` is optional, and absent means unrecorded rather than local.
     p$source <- if ("source" %in% names(p)) as.character(p$source) else
       NA_character_
+    if (!is.numeric(p$value) || !is.numeric(p$se)) {
+      rlang::abort(paste0(
+        "Component ", i, ": `value` and `se` must be numeric."
+      ))
+    }
     p <- p[, c(cols, "source"), drop = FALSE]
     p$key <- if (all(is.na(p$key))) NA_character_ else as.character(p$key)
+    if (any(!is.na(p$key) & !nzchar(trimws(p$key)))) {
+      rlang::abort(paste0(
+        "Component ", i, " has an empty `key`. Use `NA` for a row that ",
+        "applies to every key."
+      ))
+    }
     p$component <- as.character(p$component)
     p
   })
@@ -175,8 +189,8 @@ g0 <- function(...) {
       "available to be seen."
     ))
   }
-  if (any(comp$se < 0)) {
-    rlang::abort("Standard errors cannot be negative.")
+  if (any(comp$se < 0) || any(!is.finite(comp$se))) {
+    rlang::abort("Standard errors must be finite and not negative.")
   }
 
   keys <- unique(stats::na.omit(comp$key))
@@ -187,6 +201,15 @@ g0 <- function(...) {
   for (nm in unique(comp$component)) {
     rows <- comp[comp$component == nm, , drop = FALSE]
     if (nrow(rows) == 1L && is.na(rows$key[1])) next
+    # Several rows and no keys at all: a vector of values (one availability
+    # per month, say) built without `key`. Nothing says which row is which.
+    if (all(is.na(rows$key))) {
+      rlang::abort(paste0(
+        "Component \"", nm, "\" has ", nrow(rows), " rows and no `key`. ",
+        "Give each row a key (a month, a platform), or give one row with no ",
+        "key to apply everywhere."
+      ))
+    }
     if (anyNA(rows$key)) {
       rlang::abort(paste0(
         "Component \"", nm, "\" mixes keyed and unkeyed rows. Give it one row ",

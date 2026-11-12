@@ -8,7 +8,11 @@ vignette: >
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r library}
+library(dsfit)
 ```
 
 `g(0)` is the probability of detecting an animal that is directly on the
@@ -22,29 +26,21 @@ fraction of time an animal is at the surface and so visible from the air. It als
 covers how to assemble a full correction from components that come from
 elsewhere, and how to record where each one came from.
 
-The code here is shown rather than run, so the vignette needs no survey data.
+The code here runs. Where it needs detections, it uses a small simulated
+survey defined in [Before you sweep](#before-you-sweep).
 
 ## Availability
 
 `availability()` computes the availability component of `g(0)` — the probability
 an animal was at the surface to be seen while the platform had it in view.
 
-```r
+```{r availability}
 availability(
   surface = example_dive_intervals$surface,   # mean surfacing interval, s
   dive    = example_dive_intervals$dive,      # mean diving interval, s
   window  = view_window(radius = 300, speed = 50),
   key     = as.character(example_dive_intervals$month)
 )
-#> # A tibble: 6 × 4
-#>   key   component    value    se
-#>   <chr> <chr>        <dbl> <dbl>
-#> 1 Dec   availability 0.245    NA
-#> 2 Jan   availability 0.286    NA
-#> 3 Feb   availability 0.361    NA
-#> 4 Mar   availability 0.477    NA
-#> 5 Apr   availability 0.683    NA
-#> 6 May   availability 0.849    NA
 ```
 
 That spread — 0.25 to 0.85 across one season — is the entire argument against a
@@ -82,8 +78,10 @@ from about 50 s near the trackline to about 130 s at 3 km. `view_window_aerial()
 is that geometry:
 
 ```
-  t(x) = α + x · tan(θ) / v
+  t(x) = α + 2 · x · tan(θ) / v
 ```
+
+for a view running θ forward and θ aft of perpendicular.
 
 `view_window()` is the other case, a genuinely circular viewing area crossed
 along a chord:
@@ -196,29 +194,23 @@ is an inviting mistake:
 never `mrds::ddf()` — and reports the common ways a sweep goes wrong before it
 reaches the fitting:
 
-```r
+A simulated survey: 300 detections from a half-normal with a beaufort effect,
+plus 20 flatfile rows for samples with no detection.
+
+```{r detections}
+set.seed(1)
+n <- 300
+detections <- data.frame(
+  object   = 1:n,
+  beaufort = sample(0:4, n, replace = TRUE)
+)
+detections$distance <- abs(rnorm(n, 0, 900 - 90 * detections$beaufort))
+detections <- rbind(detections,
+                    data.frame(object = n + 1:20, beaufort = NA, distance = NA))
+```
+
+```{r diagnose}
 diagnose_sweep(detections, model_set(c("hn", "hr")), truncation = 2500)
-#> dsfit sweep diagnosis
-#>
-#> == Toolchain ==
-#>   ok    mrds 3.0.1 is installed
-#>
-#> == Data ==
-#>   ok    1999 rows, 1999 exact distances
-#>   note  estimate perception bias: no double-observer structure
-#>
-#> == Truncation ==
-#>   ok    1999 of 2050 rows kept at truncation 2500
-#>         dropped: 12 with no distance, 39 beyond the truncation
-#>   ok    1999 detections is at or above the 60-80 usually suggested
-#>
-#> == Model set ==
-#>   ok    2 candidates: hn, hr
-#>   WARN  no detections inside 100.1, which is 4% of the truncation width, and
-#>         neither `left` nor the gamma key is in use...
-#>
-#> == What is still assumed ==
-#>   g(0) = 1, unless a correction is applied at the abundance step.
 ```
 
 It catches the things that otherwise surface as a cryptic error from inside
@@ -243,23 +235,8 @@ rest — and the diagnosis says so instead of calling the spot handled.
 `detection_structure()` reads a table of detections and reports which analyses
 it admits — before anything is fitted:
 
-```r
+```{r structure}
 detection_structure(detections)
-#> <dsfit_structure>
-#>   200 rows, 200 exact distances
-#>   nearest detection at 0.1326 - a blind spot beneath the platform would show here
-#>
-#>   can:
-#>     fit a detection function        200 exact distances; at or above the 60-80 usually suggested
-#>     test fit with Cramer-von Mises  exact distances have an empirical distribution to test
-#>     fit covariate models            candidates: beaufort
-#>
-#>   cannot:
-#>     estimate perception bias  no double-observer structure: no `observer` or
-#>                               `detected` column. Perception needs two independent
-#>                               teams and cannot be recovered from a single-observer
-#>                               survey at any sample size
-#>     estimate availability     not estimable from distances by construction...
 ```
 
 Most of what decides whether an analysis is possible is structural, and none of
@@ -274,28 +251,30 @@ That produces a number, and the number is wrong by a factor. A third verdict,
 `partly`, catches the shape that most invites the mistake — an `observer` column
 with no `detected` indicator, which looks like double-observer data and is not.
 
-It reports; [`prepare_distance_data()`](R/prepare.R) enforces. One is a briefing,
+It reports; `prepare_distance_data()` enforces. One is a briefing,
 the other is a gate.
 
 ## Assembling a g(0) correction
 
 `g0()` stacks the components, multiplies them, and propagates their variance:
 
-```r
+```{r g0}
+avail <- availability(
+  surface    = example_dive_intervals$surface,
+  dive       = example_dive_intervals$dive,
+  window     = view_window(radius = 300, speed = 50),
+  se_surface = example_dive_intervals$se_surface,
+  se_dive    = example_dive_intervals$se_dive,
+  key        = as.character(example_dive_intervals$month)
+)
+avail$source <- "example intervals - invented"
+
+perception <- data.frame(
+  key = NA, component = "perception", value = 0.68, se = 0.09,
+  source = "AMAPPS double-observer, borrowed - not measured on this survey"
+)
+
 g0(avail, perception)
-#> <dsfit_g0>
-#>   components:  availability, perception
-#>
-#>  key     g0     se    cv
-#>  Dec 0.2814 0.0505 0.180
-#>  Jan 0.3132 0.0545 0.174
-#>  Feb 0.3668 0.0610 0.166
-#>  Mar 0.4445 0.0690 0.155
-#>  Apr 0.5679 0.0798 0.140
-#>  May 0.6466 0.0866 0.134
-#>
-#>   Divide abundance by g0, and propagate cv. This package does not
-#>   apply it: correction happens at the abundance step.
 ```
 
 It **builds an object and hands it off** rather than applying anything. This
@@ -306,10 +285,8 @@ from here is make the correction impossible to get wrong quietly:
 - **Never silently 1.** No default, and an absent component is named — in a
   warning when you build it, and again every time the object prints:
 
-  ```
-  <dsfit_g0>
-    components:  availability
-    assumed 1:   perception
+  ```{r g0-missing, warning = FALSE}
+  g0(avail)
   ```
 
 - **Propagate the variance or refuse.** A component without a standard error is
@@ -333,20 +310,12 @@ the other ten institutions' data, cautioning in print that it may have biased
 their density estimates.
 
 A borrowed correction that looks local is the failure this guards against, so
-`source` is printed every time and anything missing one is named:
+`source` is printed every time (as in the `g0(avail, perception)` output above),
+and a component without one is shown as `source not recorded`:
 
-```
-<dsfit_g0>
-  components:
-    availability  focal follows, this survey
-    perception    AMAPPS double-observer, borrowed - not measured on this survey
-```
-
-```
-<dsfit_g0>
-  assumed 1:   perception
-  components:
-    availability  source not recorded
+```{r g0-unsourced, warning = FALSE}
+avail$source <- NULL
+g0(avail)
 ```
 
 Components combine multiplicatively and independently, which gives a rule worth

@@ -82,7 +82,10 @@ detection_structure <- function(data) {
 
   if (type == "none") {
     add("fit a detection function", FALSE,
-        "no `distance`, and no `distbegin`/`distend` pair")
+        if (!n) "no rows" else
+          if (any(c("distance", "distbegin") %in% nm))
+            "the distance columns are present but every value is missing"
+          else "no `distance`, and no `distbegin`/`distend` pair")
   } else if (type == "both") {
     add("fit a detection function", NA,
         paste0("both exact and binned distances present; they have different ",
@@ -122,6 +125,10 @@ detection_structure <- function(data) {
     hit <- vocab$aliases[[toupper(x)]]
     if (is.null(hit)) x else hit
   }, character(1))
+  # NARWC names are upper case and a flatfile's are often not, so membership
+  # is tested without case: `latitude` is LATITUDE, and BEAUFORT beside
+  # beaufort is one variable named twice.
+  canon_up <- toupper(canonical)
 
   # `read_narwc(prefer_source = TRUE)` keeps a displaced column as
   # `<TARGET>_ORIGINAL` rather than discarding it - LEGTYPE_ORIGINAL where a
@@ -133,14 +140,15 @@ detection_structure <- function(data) {
   superseded <- grepl("_ORIGINAL$", toupper(nm)) &
     sub("_ORIGINAL$", "", toupper(nm)) %in% toupper(known)
 
-  keep <- !(canonical %in% structural) & !superseded
+  keep <- !(canon_up %in% toupper(structural)) & !superseded
   candidates <- nm[keep]
   candidates <- candidates[vapply(data[candidates], function(x) {
     (is.numeric(x) || is.character(x) || is.factor(x) || is.logical(x)) &&
       length(unique(x[!is.na(x)])) > 1L
   }, logical(1))]
 
-  conditions <- candidates[canonical[match(candidates, nm)] %in% vocab$conditions]
+  conditions <- candidates[canon_up[match(candidates, nm)] %in%
+                             toupper(vocab$conditions)]
 
   detail <- if (!length(candidates)) {
     "no columns beyond the structural ones vary"
@@ -160,9 +168,9 @@ detection_structure <- function(data) {
   # `read_narwc(prefer_source = TRUE)` believes the `_BK` column and keeps the
   # other as LEGTYPE_ORIGINAL. Unresolved, the pair is ambiguous rather than
   # merely redundant: nothing here can tell which one a fit should use.
-  dup_names <- unique(canonical[duplicated(canonical)])
-  dups <- lapply(dup_names, function(k) nm[canonical == k])
-  names(dups) <- dup_names
+  dup_up <- unique(canon_up[duplicated(canon_up)])
+  dups <- lapply(dup_up, function(k) nm[canon_up == k])
+  names(dups) <- canonical[match(dup_up, canon_up)]
 
   # --- Perception: the one that is usually the answer ---------------------
   obs <- perception_structure(data)

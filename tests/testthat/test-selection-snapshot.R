@@ -80,6 +80,9 @@ test_that("covariate models are stable, and mcds is the path taken", {
     truncation = 400,
     quiet = TRUE
   )
+  expect_match(paste(deparse(sw$fits[["hn bf"]]$dsmodel), collapse = ""),
+               "mcds")
+  expect_match(paste(deparse(sw$fits[["hn"]]$dsmodel), collapse = ""), "cds\\(")
   expect_snapshot(snap_table(sw))
 })
 

@@ -82,7 +82,8 @@
 #' @param key Optional labels — months, platforms, years — carried through to the
 #'   result so the rows stay attached to what they apply to.
 #'
-#' @return A tibble with one row per element of `surface`: `key`, `component`
+#' @return A tibble with one row per element of the longest of `surface`,
+#'   `dive` and `window` (each of length 1 or that length): `key`, `component`
 #'   (always `"availability"`), `value`, and `se`. That is the shape a `g(0)`
 #'   correction is assembled from, so availability and perception rows stack.
 #'
@@ -139,6 +140,7 @@ availability <- function(surface, dive, window, se_surface = NULL,
 
   n <- max(length(surface), length(dive), length(window))
   if (n == 0L) rlang::abort("`surface`, `dive` and `window` are all empty.")
+  check_recycle(list(surface = surface, dive = dive, window = window), n)
   surface <- rep_len(surface, n)
   dive <- rep_len(dive, n)
   window <- rep_len(window, n)
@@ -165,6 +167,8 @@ availability <- function(surface, dive, window, se_surface = NULL,
     ))
   }
   if (has_se) {
+    check_recycle(list(se_surface = se_surface, se_dive = se_dive,
+                       cov_surface_dive = cov_surface_dive), n)
     se_surface <- rep_len(se_surface, n)
     se_dive <- rep_len(se_dive, n)
     cov_surface_dive <- rep_len(cov_surface_dive, n)
@@ -300,11 +304,15 @@ view_window <- function(radius, speed, distance = 0) {
 #' This is the opposite of [view_window()]'s circular geometry, and it is the
 #' case that applies to a line-transect aerial survey.
 #'
-#' Following Ganley et al. (2019), for a time in view \eqn{\alpha} at the
-#' trackline, a viewing half-angle \eqn{\theta} forward and aft, and ground
-#' speed \eqn{v}:
+#' Following the linear form Ganley et al. (2019) fitted, for a time in view
+#' \eqn{\alpha} at the trackline, a viewing half-angle \eqn{\theta} forward and
+#' the same aft of perpendicular, and ground speed \eqn{v}:
 #'
-#' \deqn{t(x) = \alpha + \frac{x \tan\theta}{v}}
+#' \deqn{t(x) = \alpha + \frac{2 x \tan\theta}{v}}
+#'
+#' A point at perpendicular distance \eqn{x} enters the wedge
+#' \eqn{x \tan\theta} ahead of abeam and leaves the same distance behind, so it
+#' is in view for \eqn{2 x \tan\theta} of track.
 #'
 #' @section Calibrating it, rather than deriving it:
 #' Ganley et al. (2019) obtained \eqn{\alpha} and \eqn{\theta} by flying
@@ -322,10 +330,11 @@ view_window <- function(radius, speed, distance = 0) {
 #'
 #' @param trackline Time in view at the trackline, in seconds — \eqn{\alpha}.
 #' @param speed Ground speed, in metres per second.
-#' @param angle Viewing half-angle forward and aft, in **degrees** from
-#'   perpendicular. Give this or `slope`, not both.
+#' @param angle Viewing half-angle, in **degrees** from perpendicular: the
+#'   view runs `angle` forward and `angle` aft. Give this or `slope`, not both.
 #' @param slope Seconds of view gained per metre of perpendicular distance,
-#'   \eqn{\tan\theta / v}, if it was calibrated directly. Give this or `angle`.
+#'   \eqn{2 \tan\theta / v}, if it was calibrated directly. Give this or
+#'   `angle`.
 #' @param distance Perpendicular distance, in metres.
 #'
 #' @return A numeric vector of window durations in seconds.
@@ -345,8 +354,9 @@ view_window <- function(radius, speed, distance = 0) {
 #' view_window_aerial(trackline = 51.22, speed = 51.4, slope = 0.03,
 #'                    distance = c(0, 1000, 3000))
 #'
-#' # The same thing from a viewing half-angle
-#' view_window_aerial(trackline = 51.22, speed = 51.4, angle = 57,
+#' # The same thing from a viewing half-angle: 2 * tan(37.6 deg) / 51.4 is
+#' # about 0.03 s per metre
+#' view_window_aerial(trackline = 51.22, speed = 51.4, angle = 37.6,
 #'                    distance = c(0, 1000, 3000))
 #'
 #' @export
@@ -376,7 +386,8 @@ view_window_aerial <- function(trackline, speed, angle = NULL, slope = NULL,
         "between 0 and 90. At 90 the field of view never closes."
       ))
     }
-    slope <- tan(angle * pi / 180) / speed
+    # Forward and aft: the wedge is crossed over 2 * x * tan(angle) of track.
+    slope <- 2 * tan(angle * pi / 180) / speed
   } else if (any(!is.na(slope) & slope < 0)) {
     rlang::abort(paste0(
       "`slope` cannot be negative: an aircraft's field of view widens with ",
@@ -393,7 +404,8 @@ view_window_aerial <- function(trackline, speed, angle = NULL, slope = NULL,
 #'
 #' The window [availability()] needs, for observers searching a forward arc from
 #' a ship: a sector ahead of the bow, which a point on the water enters when it
-#' comes inside the search angle and leaves when it draws abeam.
+#' comes inside the search radius and leaves when its bearing passes the edge
+#' of the search angle (abeam, for a full forward search).
 #'
 #' @section Why a ship is neither of the other two:
 #' [view_window()] is a circular patch, watched fore and aft alike, so its
@@ -404,16 +416,17 @@ view_window_aerial <- function(trackline, speed, angle = NULL, slope = NULL,
 #' counted it would be counting the same animal twice.
 #'
 #' So the window runs from the moment the animal enters the searched sector to
-#' the moment it draws abeam, and no further. For a search radius \eqn{r}, a
+#' the moment it leaves it, and no further. For a search radius \eqn{r}, a
 #' search half-angle \eqn{\theta} measured from the bow, a speed \eqn{v} and a
 #' perpendicular distance \eqn{x}:
 #'
 #' \deqn{w(x) = \frac{\sqrt{r^2 - x^2} - x/\tan\theta}{v}}
 #'
-#' The first term is where the animal crosses the radius; the second is where it
-#' crosses the edge of the search angle. Whichever it meets later is where the
-#' window opens, so the window is zero when the second exceeds the first — an
-#' animal too far off the bow to be searched before it passes.
+#' As the vessel approaches, the animal first crosses the search radius, at
+#' \eqn{\sqrt{r^2 - x^2}} ahead, and later passes the edge of the search angle,
+#' at \eqn{x/\tan\theta} ahead. The window is the track between the two, and
+#' zero when the second exceeds the first — an animal too far off the bow to
+#' be inside both at once.
 #'
 #' At `angle = 90` the sector is the full forward half-disc, \eqn{x/\tan\theta}
 #' is zero, and the window is exactly **half** [view_window()]'s: same chord,
@@ -498,15 +511,20 @@ view_window_vessel <- function(radius, speed, angle = 90, distance = 0) {
     ))
   }
 
-  # Where the animal enters the radius, and where it enters the search arc.
-  # The window opens at whichever it meets later, which is why this is a
-  # difference and not a minimum.
+  # How far ahead the animal enters the radius, and how far ahead it leaves the
+  # search arc. The window is the track between the two.
+  n <- max(length(radius), length(speed), length(angle), length(distance))
+  angle <- rep_len(angle, n)
+  distance <- rep_len(distance, n)
   enters_radius <- sqrt(pmax(radius^2 - distance^2, 0))
   # tan(90 degrees) is not exactly infinite in floating point, so pin the
   # full-forward case to an exact zero rather than to something near it.
-  enters_arc <- ifelse(angle == 90, 0, distance / tan(angle * pi / 180))
+  # Element by element: ifelse() would take its length from `angle` alone and
+  # reuse the first distance for every other one.
+  leaves_arc <- distance / tan(angle * pi / 180)
+  leaves_arc[angle == 90] <- 0
 
-  pmax(enters_radius - enters_arc, 0) / speed
+  pmax(enters_radius - leaves_arc, 0) / speed
 }
 
 
@@ -514,6 +532,19 @@ view_window_vessel <- function(radius, speed, angle = 90, distance = 0) {
 #' @export
 view_window_ship <- view_window_vessel
 
+
+# Arguments are recycled to `n` only from length 1 or `n`. rep_len() would
+# also stretch a length-2 vector over 3 rows, pairing values by position with
+# rows they were never meant for.
+check_recycle <- function(args, n, call = rlang::caller_env()) {
+  bad <- names(args)[!lengths(args) %in% c(1L, n)]
+  if (length(bad)) {
+    rlang::abort(paste0(
+      "Lengths must be 1 or ", n, ": ",
+      paste0("`", bad, "` has ", lengths(args)[bad], collapse = ", "), "."
+    ), call = call)
+  }
+}
 
 # a = (s + d(1 - exp(-w/d))) / (s + d), Laake et al. (1997) equation 5 as
 # written out by Ganley et al. (2019).

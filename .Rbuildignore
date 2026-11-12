@@ -11,3 +11,6 @@ Rplots\.pdf
 ^figure$
 ^data-raw$
 ^\.lintr$
+^_pkgdown\.yml$
+^pkgdown$
+^pkgdown-site$

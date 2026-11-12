@@ -24,8 +24,8 @@ over a six-month season, with standard errors.
 \section{These numbers are invented}{
 
 They are not measurements. In particular they are \strong{not} Ganley et al.
-(2019)'s Cape Cod Bay values, which are not open access. Do not use them to
-correct anything.
+(2019)'s Cape Cod Bay values, which ship separately as
+\link{ganley_availability}. Do not use them to correct anything.
 
 What is real is the pattern they were built to show. Ganley et al. (2019)
 found right whale availability in Cape Cod Bay varying by month between

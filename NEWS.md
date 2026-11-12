@@ -280,10 +280,9 @@ First skeleton. The detection-function half of the fitting layer described in
   about 0.25 and 0.85. Shipped so the worked example can show the full API,
   standard errors included.
 
-* The test suite now reconciles against a published result. January's 16%
-  surface time and reported 0.27 availability, at a measured 51.22 s in view,
-  pin the dive time at about 6.1 minutes — inside the 1.30 to 8.83 min range
-  the paper gives for monthly mean dive times.
+* A test reconciling against Ganley et al.'s January figures was added here
+  and later removed: it read the 16% surface time as `E(s)/(E(s)+E(d))`,
+  which Table S1 shows it is not (see `?ganley_availability`).
 
 ## What it refuses, and why
 
@@ -333,6 +332,31 @@ Two things documented because they would otherwise be discovered the hard way:
   routinely, since `plotEffects()` forwards its own unresolved defaults.
   `match.arg()` rejects those outright, so the choices are resolved by hand.
 
+## Second audit (2026-11-12)
+
+Three independent reviews; full list in `docs/02-code-guide.md`, Section 10.1.
+
+* **Changes numbers.** Adjustment models without covariates are fitted with
+  the strict monotonicity constraint `Distance::ds()` applies by default, and
+  now match its AIC and `p`. The adjustment snapshot changes accordingly.
+* **Changes numbers.** `view_window_vessel()` was wrong for a vector of
+  distances on an arc narrower than 90 degrees, and `view_window_aerial(angle
+  =)` was missing a factor of 2 (a view runs `angle` forward *and* aft). Both
+  feed `availability()` and `g0()`. Windows from `slope =` are unchanged.
+* A binned flatfile with an all-`NA` `distance` column now fits; every
+  candidate previously failed.
+* `effect_estimates_ddf()` works for the uniform key (was `NaN`) and takes a
+  factor covariate's level in `at =`; its band always contains the estimate.
+* New refusals, each with a message naming the cause: non-numeric or negative
+  distances, duplicated `object`, `breaks` that are unsorted or miss the
+  recorded bins, infinite `truncation`, a `models` that is not a model set,
+  two-sided formulas, lengths that do not recycle evenly in `availability()`,
+  and malformed `g0()` components. Duplicate candidates are dropped with a
+  warning. Bins converted between units tile.
+* `diagnose_sweep()` no longer counts empty samples as truncation loss.
+  `detection_structure()` matches NARWC names without regard to case.
+* The availability vignette's code now runs, replacing stale printed output.
+
 ## Bug fixes
 
 * `esw` was `p` times the truncation width even when `left` was set, which
@@ -374,6 +398,7 @@ Two things documented because they would otherwise be discovered the hard way:
 
 ## Not yet built
 
-`g(0)` correction, the `dsm` handoff, plotting detectability against a
-covariate (a different quantity from g(x), and not the same plot), and a
-vignette.
+The `dsm` handoff, and plotting detectability against a covariate (a
+different quantity from g(x), and not the same plot). The `g(0)` correction
+slot and the vignettes listed under that heading at first have since been
+built.

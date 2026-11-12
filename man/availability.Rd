@@ -36,7 +36,8 @@ optimistic when they are not.}
 result so the rows stay attached to what they apply to.}
 }
 \value{
-A tibble with one row per element of \code{surface}: \code{key}, \code{component}
+A tibble with one row per element of the longest of \code{surface},
+\code{dive} and \code{window} (each of length 1 or that length): \code{key}, \code{component}
 (always \code{"availability"}), \code{value}, and \code{se}. That is the shape a \code{g(0)}
 correction is assembled from, so availability and perception rows stack.
 }

@@ -1,8 +1,8 @@
 # Generates `example_dive_intervals`.
 #
 # THESE NUMBERS ARE INVENTED. They are not measurements, and in particular they
-# are not Ganley et al. (2019)'s Cape Cod Bay values, which are behind a
-# paywall and were never available to this script.
+# are not Ganley et al. (2019)'s Cape Cod Bay values, which ship separately as
+# `ganley_availability` (data-raw/ganley-tables.R).
 #
 # What is real is the *pattern* they were chosen to show. Ganley et al. (2019)
 # found right whale availability in Cape Cod Bay varying by month between 0.27

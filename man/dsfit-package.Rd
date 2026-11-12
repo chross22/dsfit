@@ -37,8 +37,10 @@ difference.
 Estimate \code{g(0)}. Every fit conditions on the animal having been available and
 seen, and a mis-specified \code{g(0)} shifts every candidate in a model set by the
 same factor — so the ranking looks untouched while the density is wrong.
-It cannot be estimated from a standard NARWC extract, which records neither
-dive data nor the double-observer structure mark-recapture needs. Correct for
+It cannot be estimated from sighting distances alone: availability needs dive
+data, and perception needs a double-observer structure that some NARWC
+programmes recorded and many did not (\code{\link[=detection_structure]{detection_structure()}} says which a
+given extract has). Correct for
 it at the abundance step, from external sources, with its standard error
 propagated.
 }

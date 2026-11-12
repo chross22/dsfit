@@ -84,6 +84,8 @@
 #' @export
 model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
                       formula = ~1) {
+  key <- as.character(key)
+  if (!is.null(adjustment)) adjustment <- as.character(adjustment)
   known_key <- c("hn", "hr", "unif", "gamma")
   bad <- setdiff(key, known_key)
   if (length(bad)) {
@@ -111,8 +113,12 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
   }
 
   formulas <- if (inherits(formula, "formula")) list(formula) else formula
-  if (!all(vapply(formulas, inherits, logical(1), "formula"))) {
-    rlang::abort("`formula` must be a one-sided formula, or a list of them.")
+  if (!all(vapply(formulas, inherits, logical(1), "formula")) ||
+      any(lengths(formulas) != 2L)) {
+    rlang::abort(paste0(
+      "`formula` must be a one-sided formula, or a list of them: `~beaufort`, ",
+      "not `distance ~ beaufort`."
+    ))
   }
 
   grid <- expand.grid(
@@ -194,6 +200,18 @@ model_set <- function(key = c("hn", "hr"), adjustment = NULL, order = NULL,
     label_model(out$key[i], out$adjustment[i], grid$orders[[i]],
                 out$formula[i])
   }, character(1))
+
+  # Repeated keys, orders or formulas give identical candidates under one
+  # model_id: the fits list cannot tell them apart, and each would sit at
+  # delta AIC 0 beside its twin.
+  dup <- duplicated(out$model_id)
+  if (any(dup)) {
+    rlang::warn(paste0(
+      "Dropping duplicate candidate(s): ",
+      paste(unique(out$model_id[dup]), collapse = ", "), "."
+    ))
+    out <- out[!dup, , drop = FALSE]
+  }
 
   out[, c("model_id", "key", "adjustment", "order", "formula", "dsmodel")]
 }

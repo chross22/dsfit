@@ -98,6 +98,15 @@ to a model set that contains the gamma key accounts for the blind spot twice,
 and warns.
 }
 
+\section{Adjustment terms are fitted monotone}{
+
+As in \code{Distance::ds()}, a candidate with adjustment terms and no covariates
+is fitted with a strict monotonicity constraint (\verb{mono = TRUE, mono.strict = TRUE} in \code{mrds}), so g(x) does not rise above 1 or turn back
+upward. The AIC and \code{p} then match \code{ds()} fitted with its defaults. Covariate
+models are unconstrained, as \code{ds()} leaves them, and so is the gamma key,
+which rises to a peak by design.
+}
+
 \section{This does not estimate g(0)}{
 
 Every fit here conditions on the animal having been available and seen. For a
