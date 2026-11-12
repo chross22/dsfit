@@ -1,6 +1,8 @@
-# The ranked selection table from a sweep
+# Get the selection table from a sweep
 
-The ranked selection table from a sweep
+Returns the table of fitted candidates from a
+[`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md)
+result, sorted by AIC (lowest first).
 
 ## Usage
 
@@ -12,19 +14,55 @@ selection_table(x, converged_only = TRUE)
 
 - x:
 
-  A `dsfit_sweep` from
+  A `dsfit_sweep` object from
   [`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md).
 
 - converged_only:
 
-  Drop models that failed to fit. Default `TRUE`.
+  Logical. `TRUE` (default) drops candidates that failed to fit or did
+  not converge.
 
 ## Value
 
-A tibble, sorted by AIC, with `model_id`, `key`, `adjustment`, `order`,
-`formula`, `converged`, `n_par`, `aic`, `delta_aic`, `p`, `p_se`,
-`p_cv`, `esw`, and a goodness-of-fit p-value in `cvm_p` (exact
-distances) or `chisq_p` (binned).
+A tibble with one row per candidate and columns:
+
+- `model_id`, `key`, `adjustment`, `order`, `formula`:
+
+  The candidate, as in
+  [`model_set()`](https://camilleross.org/dsfit/reference/model_set.md).
+
+- `converged`:
+
+  `TRUE` if the fit succeeded.
+
+- `n_par`:
+
+  Number of estimated parameters.
+
+- `aic`, `delta_aic`:
+
+  AIC, and its difference from the lowest AIC.
+
+- `p`, `p_se`, `p_cv`:
+
+  Average detection probability over the searched strip, its standard
+  error, and its coefficient of variation.
+
+- `esw`:
+
+  Effective strip half-width: `p` times the width of the searched strip
+  (`truncation` minus `left`).
+
+- `cvm_p`:
+
+  Cramer-von Mises goodness-of-fit p-value. `NA` for binned distances.
+
+- `chisq_p`:
+
+  Chi-square goodness-of-fit p-value. The test to read for binned
+  distances.
+
+Columns describing a fit are `NA` for a candidate that failed.
 
 ## See also
 

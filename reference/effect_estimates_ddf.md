@@ -1,13 +1,13 @@
-# Extract a fitted detection function as a tidy frame
+# Extract a fitted detection function as a plottable data frame
 
-An
-[`fancyfx::effect_estimates()`](https://camilleross.org/fancyfx/reference/effect_estimates.html)
-method for `mrds` detection functions, so that a fitted `ddf` can be
-plotted with
+Evaluates a fitted `mrds` detection function \\g(x)\\ on a grid of
+distances, with a delta-method interval, and returns it in the format
+that
 [`fancyfx::plotEffects()`](https://camilleross.org/fancyfx/reference/plotEffects.html)
 and
 [`fancyfx::plotRugs()`](https://camilleross.org/fancyfx/reference/plotRugs.html)
-like any other model.
+draw. The detection function \\g(x)\\ is the probability that an animal
+at perpendicular distance \\x\\ from the trackline is detected.
 
 ## Usage
 
@@ -46,35 +46,32 @@ effect_estimates_ddf(
 
 - var:
 
-  Must be `"distance"`. A detection function has one predictor; plotting
-  detectability against a covariate is a different quantity and is not
-  built yet.
+  Must be `"distance"`. Plotting detectability against a covariate is
+  not supported.
 
 - scale:
 
-  Accepted for compatibility with the generic, and ignored. A detection
-  function has no separable linear predictor, so every setting gives
-  \\g(x)\\ on the probability scale.
+  Accepted for compatibility with the generic and ignored. The result is
+  always on the probability scale.
 
 - interval:
 
-  `"se"` for a one-standard-error ribbon, `"ci"` for a confidence
-  interval at `level`, or `"auto"` (which `fancyfx` forwards by default)
-  for `"se"`. `"cri"` is refused: there is no posterior here to
-  summarise.
+  `"se"` for plus and minus one standard error, `"ci"` for a confidence
+  interval at `level`, or `"auto"` (the default) for `"se"`. `"cri"` is
+  an error, because there is no posterior.
 
 - level:
 
-  Confidence level, used when `interval = "ci"`.
+  Confidence level, used only when `interval = "ci"`.
 
 - n:
 
-  Number of distances at which to evaluate the function.
+  Number of distances at which to evaluate \\g(x)\\.
 
 - at:
 
-  Named list fixing covariate values, or `NULL` (default) to average
-  over the covariates as observed.
+  Named list of covariate values to fix, or `NULL` (default) to average
+  over the observed covariate values.
 
 - ...:
 
@@ -82,75 +79,87 @@ effect_estimates_ddf(
 
 ## Value
 
-A data frame with `.x`, `.estimate`, `.lower`, `.upper`, and a
-`"quantity"` attribute, as
+A data frame with one row per grid distance and columns `.x` (distance),
+`.estimate` (\\g(x)\\), `.lower` and `.upper` (interval bounds). Its
+`"quantity"` attribute is `"Detection probability g(x)"`, which
+`fancyfx` uses as the axis label. This is the format
 [`fancyfx::effect_estimates()`](https://camilleross.org/fancyfx/reference/effect_estimates.html)
 specifies.
 
-## Why this method has to exist
+## How it works
 
-`fancyfx` sends anything that is not a GAM to `marginaleffects`, which
-cannot introspect a `ddf` — it reports no predictors at all. The generic
-is designed to be extended from outside the package, and this is that
-extension. Nothing downstream needs to change: the transforms, the
-ribbon, the rug, and the panel arranging all work off the frame returned
-here.
+1.  `interval` and `scale` are checked. `"auto"` becomes `"se"`, and
+    `"cri"` is refused.
 
-## What it returns, and what it does not
+2.  `var` is checked: only `"distance"` is accepted.
 
-The detection function \\g(x)\\: the probability that an animal at
-perpendicular distance \\x\\ was detected, given that it was available
-to be. It is **not** the probability that an animal at that distance was
-there and seen, and no `g(0)` correction is applied — see
-[`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md).
+3.  A grid of `n` distances is built from the left truncation distance
+    (0 if none) to the right truncation width.
 
-A rug of the observed distances beneath this curve is the standard
-detection-function diagnostic, which is `fancyfx`'s premise applied
-almost exactly.
+4.  If `at` is given, the named covariates are set to those values.
+
+5.  \\g(x)\\ is evaluated at every grid distance for every observed
+    covariate combination, and the curves are averaged.
+
+6.  The standard error at each distance is computed by the delta method
+    from the fitted parameters and their inverse Hessian.
+
+7.  The lower and upper bounds are the estimate minus and plus one
+    standard error (`"se"`) or a normal quantile times it (`"ci"`),
+    clamped to `[0, 1]`.
+
+## What the curve is
+
+The curve is \\g(x)\\ conditional on the animal being available to be
+seen. No `g(0)` correction is applied; see
+[`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md)
+and [`g0()`](https://camilleross.org/dsfit/reference/g0.md). Plotting it
+over a rug of the observed distances is the standard check of a
+detection function's fit.
 
 ## Covariate models
 
-the curve is averaged, not evaluated at a mean: With detection
-covariates there is one \\g(x)\\ per covariate combination. This
-averages those curves over the covariate values actually observed,
-rather than evaluating the function once at mean covariates. The two are
-different, and averaging the curves is the one that has a meaning: it is
-the mean detection function of the animals in the sample.
+A model with detection covariates has one \\g(x)\\ per covariate
+combination. This function averages those curves over the covariate
+values of the detected animals. It does not evaluate one curve at the
+mean covariate values, which is a different and less meaningful
+quantity.
 
-`at` fixes named covariates at chosen values; anything not named is
-still averaged over as observed. `at = NULL` averages over everything.
+`at` fixes named covariates at chosen values. Covariates not named in
+`at` are still averaged over their observed values.
 
-## Why the area under this curve is not `esw`
+## Relation to `esw` and average detection probability
 
-For an intercept-only model, the mean of this curve over the truncation
-width is exactly the fitted average detection probability, and the area
-under it is the effective strip half-width in
-[`selection_table()`](https://camilleross.org/dsfit/reference/selection_table.md).
-The tests assert that.
+The average detection probability \\p\\ is the mean of \\g(x)\\ over the
+truncation interval. The effective strip half-width (`esw`) in
+[`selection_table()`](https://camilleross.org/dsfit/reference/selection_table.md)
+is \\p\\ times the width of that interval.
 
-For a **covariate** model the two differ slightly, and it is worth
-knowing why rather than discovering it. `mrds` reports `average.p` as a
-Horvitz-Thompson mean, \\n / \sum 1/p_i\\, which weights each animal by
-the inverse of its own detection probability — correcting for the fact
-that a sample of detections over-represents the covariate values that
-are easy to detect. The curve here is the plain arithmetic mean over the
-animals as observed, \\(1/n) \sum g(x \mid z_i)\\, which is what you
-want to look at next to a histogram of those same animals' distances.
+For an intercept-only model, the mean of the curve returned here equals
+the fitted \\p\\. The package tests check this.
 
-The two coincide when detection probability is constant, and differ by a
-fraction of a percent otherwise. `esw` in the selection table uses the
-Horvitz-Thompson version, so eyeballing the area under this curve will
-not reproduce it exactly for a covariate model.
+For a covariate model the two differ slightly. `mrds` reports
+`average.p` as a Horvitz-Thompson mean, \\n / \sum 1/p_i\\, which
+weights each animal by the inverse of its own detection probability.
+This curve is the plain mean over the detected animals, \\(1/n) \sum g(x
+\mid z_i)\\, which is the right curve to compare with a histogram of
+their distances. On the package's covariate test fixture (half-normal,
+`~bf`, width 400) the plain mean is 0.401 and `average.p` is 0.388, a
+difference of 3.5%. The area under this curve therefore does not
+reproduce `esw` exactly for a covariate model.
 
-## The interval is a delta-method approximation
+## The interval
 
-\\g(x)\\ is deterministic given the fitted parameters, so the
-uncertainty comes from them: the Jacobian of \\g\\ with respect to the
-parameter vector is taken numerically and combined with the inverse
-Hessian. The result is clamped to `[0, 1]`, since a probability cannot
-leave it — which means an interval touching 0 or 1 is a bound, not an
-estimate. Where the Hessian cannot be inverted the estimates are
-returned with missing bounds rather than no estimates.
+\\g(x)\\ is a fixed function of the fitted parameters, so its
+uncertainty comes from theirs. The Jacobian of \\g\\ with respect to the
+parameters is computed numerically and combined with the inverse Hessian
+(the delta method). Bounds are clamped to `[0, 1]`, so a bound at 0 or 1
+is a limit, not an estimate. If the Hessian cannot be inverted, a
+warning is given and the bounds are `NA`.
+
+`fancyfx` sends models it does not recognise to `marginaleffects`, which
+finds no predictors in a `ddf` object. This method is what lets a `ddf`
+be plotted.
 
 ## References
 
@@ -183,7 +192,7 @@ head(est)
 attr(est, "quantity")
 #> [1] "Detection probability g(x)"
 
-# The integral of the curve is the fitted average detection probability
+# The mean of the curve is the fitted average detection probability
 mean(est$.estimate) # approximately summary(fit)$average.p
 #> [1] 0.3509216
 ```

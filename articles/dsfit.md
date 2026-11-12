@@ -1,20 +1,57 @@
 # Fitting and comparing detection functions
 
-This walks one survey from a table of distances to a `g(0)` correction,
-stopping where the package stops. The through-line is that **a detection
-function is chosen for its consequences, not its AIC**, and that most of
-the ways this goes wrong are silent.
+This guide walks through one basic dsfit run, from a table of detection
+distances to a g(0) correction. dsfit fits a set of candidate detection
+functions with [`mrds::ddf()`](https://rdrr.io/pkg/mrds/man/ddf.html)
+and puts them in one table for comparison.
+
+Some terms used throughout:
+
+- The **detection function** g(x) is the probability that an animal at
+  perpendicular distance x from the trackline is detected.
+- The **average detection probability** `p` is the mean of g(x) over the
+  truncation interval: the fraction of animals in the strip that were
+  seen.
+- The **effective strip half-width** (`esw`) is `p` times the width of
+  the truncation interval. It is the half-width of a strip in which
+  every animal would be seen, giving the same expected number of
+  detections. Density is estimated by dividing by it.
+- **g(0)** is the probability of detecting an animal on the trackline.
+  Every fit here assumes g(0) = 1. Section 7 covers how to correct for
+  that.
+
+The same steps are available as numbered example scripts, one per step:
+`01-load-data.R`, `02-check-data.R`, `03-fit-detection-functions.R`,
+`04-inspect-and-plot.R` and `05-g0-correction.R`. They are installed
+with the package, in the directory returned by
+`system.file("scripts", package = "dsfit")`.
 
 ``` r
 
 library(dsfit)
 ```
 
-## A survey to work with
+## 1. The data and its required columns
 
-No detection data ships with the package, so here is a simulated aerial
-survey. It has a blind spot beneath the aircraft, which is what makes it
-worth using: that single feature drives most of the decisions below.
+dsfit takes a data frame with one row per detection. The columns it uses
+are:
+
+| column | required | meaning |
+|----|----|----|
+| `distance` | yes, for exact distances | perpendicular distance from the trackline |
+| `distbegin`, `distend` | yes, for binned distances (instead of `distance`) | the distance bin each detection was recorded in |
+| `object` | no | a unique row identifier; added if missing |
+| `size` | no | group size, needed to estimate individuals rather than groups |
+| covariates | no | any column named in a model formula, e.g. `beaufort` |
+
+A row with a missing distance records a sample with no detections. These
+rows are dropped before fitting.
+
+No detection data ships with the package, so this guide uses a simulated
+aerial survey. Detection falls off with distance, falls off faster in
+rougher seas (higher Beaufort sea state), and is zero within 100 m of
+the trackline. That 100 m gap is a blind spot: the observers cannot see
+directly beneath the aircraft.
 
 ``` r
 
@@ -46,10 +83,10 @@ nrow(detections)
 #> [1] 1999
 ```
 
-## Before fitting: what does this data support?
+## 2. Checking the data
 
 [`detection_structure()`](https://camilleross.org/dsfit/reference/detection_structure.md)
-reads the table and reports which analyses it admits. Nothing is fitted.
+reads the table and reports which analyses it supports. It fits nothing.
 
 ``` r
 
@@ -62,7 +99,7 @@ detection_structure(detections)
 #>     fit a detection function        1999 exact distances; at or above the 60-80 usually suggested
 #>     test fit with Cramer-von Mises  exact distances have an empirical distribution to test
 #>     test fit with chi-square        over cutpoints mrds chooses, which makes it the weaker test here
-#>     fit covariate models            candidates: beaufort
+#>     fit covariate models            candidates: beaufort; recorded as survey conditions: beaufort
 #>     carry group size to abundance   `size` present
 #> 
 #>   cannot:
@@ -72,28 +109,44 @@ detection_structure(detections)
 #>   Structure only. That something is supported is not a reason to do it.
 ```
 
-Two lines there matter more than the rest.
+Two lines in this report affect the analysis:
 
-**The nearest detection is not at zero.** That is the blind spot, and it
-decides the model set below.
+- **The nearest detection is at 100 m, not near 0.** This is the blind
+  spot. It decides the model set in Section 3.
+- **Perception bias cannot be estimated.** Perception bias is the chance
+  of missing an animal that was at the surface and in view. Estimating
+  it needs two independent observer teams, and this survey has one. More
+  data does not change this. It is handled in Section 7.
 
-**Perception bias is not estimable.** This survey has one observer team,
-so no amount of data recovers it. That is a property of the survey
-programme rather than of any archive the data ends up in, and it does
-not improve with sample size. The point of asking now is that fitting
-anyway produces a number, and the number is wrong by a factor.
-
-## The model set
-
-An aircraft that cannot see beneath itself has two honest treatments,
-and they are alternatives rather than a pair:
-
-- a **gamma** key, which is unimodal with its peak away from zero, or
-- **left truncation**, which removes the blind spot from the data.
-
-Using both counts the blind spot twice, and
+[`diagnose_sweep()`](https://camilleross.org/dsfit/reference/diagnose_sweep.md)
+is the second check. It takes the data and a model set (Section 3) and
+runs the checks
 [`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md)
-warns when a model set containing gamma is fitted with `left`.
+runs before fitting, without fitting anything. It reports problems such
+as a formula naming a missing column, a truncation that drops most of
+the data, or a model set that handles the blind spot twice. The
+availability vignette shows its output
+([`vignette("availability", package = "dsfit")`](https://camilleross.org/dsfit/articles/availability.md)).
+
+## 3. Building a model set
+
+[`model_set()`](https://camilleross.org/dsfit/reference/model_set.md)
+lists the candidate models: one row per combination of key function,
+adjustment terms and covariate formula. The key function is the basic
+shape of g(x): half-normal (`"hn"`), hazard-rate (`"hr"`), uniform
+(`"unif"`) or gamma (`"gamma"`).
+
+A blind spot can be handled in one of two ways:
+
+- the **gamma** key, whose g(x) rises to a peak away from zero, or
+- **left truncation** (`left =` in
+  [`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md)),
+  which removes detections closer than a given distance before fitting.
+
+Use one or the other. Using both accounts for the blind spot twice, and
+[`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md)
+warns if a model set containing gamma is fitted with `left`. The first
+set includes gamma and no left truncation:
 
 ``` r
 
@@ -107,11 +160,12 @@ models[, c("model_id", "key", "formula")]
 #> 3 gamma    gamma ~1
 ```
 
-## The sweep
+## 4. Running the sweep
 
-Truncation is one value for the whole sweep, by construction. AIC
-compares models fitted to the same data, so a table mixing truncations
-is not a ranking.
+[`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md)
+fits every model in the set to the same data. The truncation distance is
+a single value for the whole sweep, because AIC can only compare models
+fitted to the same data.
 
 ``` r
 
@@ -119,6 +173,8 @@ sw <- sweep_models(detections, models, truncation = 2500)
 #> Fitted 3 of 3 candidate models to 1999 detections, truncation 2500.
 #>   g(0) = 1 is assumed; see `?sweep_models`.
 ```
+
+Printing the result gives a short summary of the fits:
 
 ``` r
 
@@ -137,11 +193,10 @@ sw
 #>   imply materially different abundance. g(0) = 1 is assumed.
 ```
 
-## Read the table across, not down
+## 5. Reading the selection table
 
-The AIC column answers “which model best describes these distances”. It
-does not answer “what does this imply about how many animals there
-were”, and the two can disagree.
+[`selection_table()`](https://camilleross.org/dsfit/reference/selection_table.md)
+returns one row per fitted model, sorted by AIC.
 
 ``` r
 
@@ -154,42 +209,41 @@ selection_table(sw)[, c("model_id", "delta_aic", "p", "p_cv", "esw", "cvm_p")]
 #> 3 hn            407. 0.296 0.0177  739. 0.00132
 ```
 
-`esw` is the effective strip half-width — the width of the strip that
-would have produced this many detections under certain detection. It is
-what abundance is divided by, so a spread in `esw` is a spread in
-density, directly and proportionally. Across these three it runs from
-roughly 640 to 890 m, so the same survey implies densities differing by
-about 40% depending on which model you take.
+| column | meaning |
+|----|----|
+| `model_id` | the model’s name from [`model_set()`](https://camilleross.org/dsfit/reference/model_set.md) |
+| `key`, `adjustment`, `order`, `formula` | the model specification |
+| `converged`, `n_par`, `aic` | whether the fit converged, number of parameters, AIC |
+| `delta_aic` | AIC minus the lowest AIC in the table; 0 for the best model |
+| `p`, `p_se`, `p_cv` | average detection probability, its standard error, and its coefficient of variation (CV, the standard error divided by the estimate) |
+| `esw` | effective strip half-width, in the units of `distance` |
+| `cvm_p` | p-value of the Cramér-von Mises goodness-of-fit test, for exact distances |
+| `chisq_p` | p-value of the chi-square goodness-of-fit test; use this one for binned distances, where `cvm_p` is `NA` |
 
-Now read `cvm_p`, whose null is that the fitted function describes the
-observed distances. **Every model in this table fails it**, the winner
-included. The AIC column ranked them against each other and had no way
-to say that none of them fit.
+Read three things for each model, not only `delta_aic`:
 
-For binned data the column to read is `chisq_p` instead, because
-Cramér-von Mises tests an empirical distribution that binned distances
-do not have.
+1.  **`delta_aic`** ranks the models against each other. It does not say
+    whether any of them fits.
+2.  **`cvm_p`** (or `chisq_p` for binned data) tests whether the model
+    fits the observed distances. A small value (below 0.05) means it
+    does not.
+3.  **`esw`** is what abundance is divided by, so a difference in `esw`
+    between models is a proportional difference in estimated density.
+    Here `esw` runs from about 640 m to about 890 m, so the choice of
+    model changes the density estimate by about 40%.
 
-### What the failure is telling you
+### Goodness of fit and the blind spot
 
-It is not that a fourth key would fit better. It is that a **hard
-geometric cutoff is not a detection function**. The gamma key models
-detection *falling off* toward the trackline, smoothly; the aircraft
-here sees nothing at all below 100 m. No key function reproduces a
-cliff, so all of them misfit the near distances and the goodness-of-fit
-test says so.
+All three models fail the goodness-of-fit test, including the best by
+AIC. The blind spot in this survey is a sharp cutoff at 100 m. No key
+function, gamma included, has a sharp cutoff, so all of them misfit the
+near distances. The fix is to remove the cutoff from the data with left
+truncation rather than to try more keys.
 
-The fix is not a better model. It is to stop asking the model to
-describe geometry.
+### Refitting with left truncation
 
-## Left truncation, the other route
-
-Remove the blind spot from the data rather than modelling it. Gamma is
-left out of this set deliberately: it and `left` are alternative
-treatments of the same phenomenon, and applying both counts the blind
-spot twice —
-[`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md)
-warns if you try.
+Gamma is left out of this set because left truncation already handles
+the blind spot.
 
 ``` r
 
@@ -203,22 +257,19 @@ selection_table(sw_left)[, c("model_id", "delta_aic", "p", "esw", "cvm_p")]
 #> 2 hr            71.8 0.295  707. 0.000352
 ```
 
-The half-normal now passes comfortably. Same survey, same animals, and
-the difference between a model set that fits and one that does not was a
-statement about the aircraft rather than about the whales.
+The half-normal now passes the goodness-of-fit test. The hazard-rate
+still fails, so the test is distinguishing between models, not only
+approving the best one.
 
-Note that `hr` still fails, so the goodness-of-fit column is doing work
-here beyond rubber-stamping the winner.
+The AIC values in this table cannot be compared with those in the
+previous table, because the two sweeps were fitted to different data.
+The `esw` values can be compared.
 
-Comparing these AICs with the ones in the previous table would be a
-mistake — different data, different likelihood. What *is* comparable is
-what the two routes imply for `esw`, and that is a question about the
-survey rather than about the models.
+### Adding a covariate
 
-## Covariates
-
-A covariate model fits a separate detection function per covariate
-value, so `p̄` becomes a mean over the animals seen.
+A model with a detection covariate, such as `~beaufort`, fits a
+different g(x) for each covariate value. Its `p` is then an average over
+the detected animals.
 
 ``` r
 
@@ -235,52 +286,58 @@ selection_table(sw_cov)[, c("model_id", "delta_aic", "p", "p_cv", "esw")]
 #> 2 hn               26.2 0.244 0.0177  584.
 ```
 
-Sea state was built into the simulation, so a model that knows about it
-should win here. On real data it often does not, and a covariate that
-does not earn its parameter is worth dropping.
+Sea state affects detection in the simulation, and the model with
+`beaufort` has the lower AIC. On real data, drop a covariate that does
+not improve AIC.
 
-## Plotting
+## 6. Plotting the chosen detection function
 
-[`effect_estimates.ddf()`](https://camilleross.org/dsfit/reference/effect_estimates_ddf.md)
-makes a fitted detection function plottable with
-[fancyfx](https://github.com/chross22/fancyfx), giving the standard
-diagnostic — fitted g(x) with a delta-method ribbon and a rug of the
-observed distances.
+The fitted models are stored in `sw$fits`, named by `model_id`. dsfit
+provides an `effect_estimates()` method for these fits so that
+[fancyfx](https://github.com/chross22/fancyfx) can plot them. The plot
+shows the fitted g(x) with a delta-method standard-error band, over a
+rug of the observed distances.
 
 ``` r
 
 fancyfx::plotEffects(sw$fits[["hn"]], dat = detections, var = "distance")
 ```
 
-For a **covariate** model, the area under that curve is not the `esw` in
-the table. `mrds` reports `average.p` as a Horvitz-Thompson mean,
-weighting each animal by the inverse of its own detection probability;
-the plotted curve is the plain mean over the animals as observed. They
-coincide only when detection probability is constant.
+To get the curve as a data frame instead, use
+[`effect_estimates_ddf()`](https://camilleross.org/dsfit/reference/effect_estimates_ddf.md).
 
-## g(0): what the fit assumed
+For a covariate model, the area under the plotted curve does not exactly
+equal the `esw` in the table. The curve is the plain mean of g(x) over
+the detected animals. `mrds` computes `p`, and so `esw`, as a
+Horvitz-Thompson mean, which weights each animal by the inverse of its
+detection probability. The two are equal only when detection probability
+is the same for every animal.
 
-Every fit above conditions on the animal having been available and seen.
-A mis-specified `g(0)` scales every candidate in the set by the same
-factor, so the ranking looks untouched while the density is wrong —
-which is exactly why it cannot be caught by model selection and has to
-be handled deliberately.
+## 7. Handing off g(0)
 
-Three separate things present as `g(0) < 1`:
+Every fit above assumes g(0) = 1: an animal on the trackline is always
+seen. If that is wrong, every model’s `p` is wrong by the same factor.
+The AIC ranking does not change, so model selection cannot detect it.
+The correction is built separately and applied when abundance is
+calculated.
 
-| component | what it is | where it comes from |
+Three separate causes make g(0) less than 1:
+
+| component | what it is | how it is handled |
 |----|----|----|
-| blind spot | the aircraft cannot see beneath itself | handled above, by gamma or `left` |
-| availability | the animal was submerged | dive data — external |
-| perception | the animal was up and missed | a second observer team |
+| blind spot | the observers cannot see beneath the aircraft | gamma key or `left`, as in Sections 3 to 5 |
+| availability | the animal was underwater as the aircraft passed | computed from dive data with [`availability()`](https://camilleross.org/dsfit/reference/availability.md) |
+| perception | the animal was at the surface and missed | estimated from a second observer team, elsewhere |
 
-### Availability is computed, not estimated
+### Availability
 
-An animal submerged for the whole pass is missed at *every* distance
-equally, so availability leaves no signature in the distance
-distribution. There is nothing to estimate it from. It is computed
-instead, from dive intervals and how long the platform keeps a point in
-view.
+An animal that is underwater for the whole pass is missed at every
+distance equally. This leaves no trace in the distances, so availability
+cannot be estimated from them. It is computed instead from dive
+intervals and the time the aircraft keeps a point in view.
+
+The package includes availability measured for right whales in Cape Cod
+Bay by Ganley et al. (2019):
 
 ``` r
 
@@ -296,20 +353,17 @@ ganley_availability
 #> #   hours_followed <dbl>
 ```
 
-Those are measurements from Cape Cod Bay, and the swing is the point:
-**0.27 in January against 0.91 in April**, as the copepods the whales
-feed on move up through the water column. A single representative figure
-would be a real number for one month and wrong by a factor of three for
-another.
+Availability was 0.27 in January and 0.91 in April. A single value for
+the whole season would be wrong by up to a factor of three in some
+months.
 
 [`availability()`](https://camilleross.org/dsfit/reference/availability.md)
-computes it from your own platform and dive data. An aircraft’s field of
-view is a wedge running forward and aft, so time in view *grows* with
-perpendicular distance —
-[`view_window_aerial()`](https://camilleross.org/dsfit/reference/view_window_aerial.md)
-is that geometry, and
-[`view_window()`](https://camilleross.org/dsfit/reference/view_window.md)
-is the circular case, which narrows.
+computes availability from mean surfacing and diving intervals and a
+time-in-view window. The window here is from
+[`view_window_aerial()`](https://camilleross.org/dsfit/reference/view_window_aerial.md),
+which models an aircraft’s field of view; at the trackline it is 51.22
+s. The intervals are Ganley et al.’s means. The standard errors are for
+illustration.
 
 ``` r
 
@@ -331,12 +385,18 @@ avail
 #> 4 Apr   availability 0.945 0.00918
 ```
 
+These values differ from Ganley et al.’s published figures. Theirs are
+bootstrap medians that were not computed at a common window; the
+availability vignette explains this.
+
 ### Assembling the correction
 
-[`g0()`](https://camilleross.org/dsfit/reference/g0.md) stacks the
-components, multiplies them and propagates the variance. It builds an
-object and hands it off; this package does not compute abundance, so it
-does not apply it.
+[`g0()`](https://camilleross.org/dsfit/reference/g0.md) combines the
+components by multiplying them, and propagates their standard errors. It
+returns a correction object for use at the abundance step. dsfit does
+not compute abundance, so it does not apply the correction. The `source`
+column records where each component came from and is printed with the
+result.
 
 ``` r
 
@@ -363,58 +423,63 @@ g0(avail, perception)
 #>   apply it: correction happens at the abundance step.
 ```
 
-Three things that object refuses to let you do quietly:
+[`g0()`](https://camilleross.org/dsfit/reference/g0.md) enforces three
+rules:
 
-**It will not default to 1.** Leave perception out and it says so, in a
-warning and again every time it prints:
+1.  **A missing component is named, not set silently to 1.** Leaving out
+    perception gives a warning, and the printed object lists it under
+    “assumed 1”:
 
-``` r
+    ``` r
 
-g0(avail)
-#> Warning: No "perception" component: it is being left at 1. If that is
-#> deliberate, say so where this correction is used - correcting for one component
-#> while believing you have corrected for another is how these estimates go wrong
-#> by a factor rather than a percentage.
-#> <dsfit_g0>
-#>   assumed 1:   perception
-#>   components:
-#>     availability  focal follows, this survey
-#> 
-#>  key     g0     se    cv
-#>  Jan 0.1667 0.0141 0.085
-#>  Feb 0.5652 0.0337 0.060
-#>  Mar 0.3940 0.0310 0.079
-#>  Apr 0.9447 0.0092 0.010
-#> 
-#>   Divide abundance by g0, and propagate cv. This package does not
-#>   apply it: correction happens at the abundance step.
-```
+    g0(avail)
+    #> Warning: No "perception" component: it is being left at 1. If that is
+    #> deliberate, say so where this correction is used - correcting for one component
+    #> while believing you have corrected for another is how these estimates go wrong
+    #> by a factor rather than a percentage.
+    #> <dsfit_g0>
+    #>   assumed 1:   perception
+    #>   components:
+    #>     availability  focal follows, this survey
+    #> 
+    #>  key     g0     se    cv
+    #>  Jan 0.1667 0.0141 0.085
+    #>  Feb 0.5652 0.0337 0.060
+    #>  Mar 0.3940 0.0310 0.079
+    #>  Apr 0.9447 0.0092 0.010
+    #> 
+    #>   Divide abundance by g0, and propagate cv. This package does not
+    #>   apply it: correction happens at the abundance step.
+    ```
 
-**It will not accept a component without a standard error.** The CV of
-`g(0)` routinely dominates the CV of abundance, so dropping it inverts
-which uncertainty matters.
-[`availability()`](https://camilleross.org/dsfit/reference/availability.md)
-returns `se = NA` when you give it no interval standard errors, and
-[`g0()`](https://camilleross.org/dsfit/reference/g0.md) refuses that —
-the two rules close a loop.
+2.  **Every component needs a standard error.** The CV of g(0) is often
+    the largest part of the CV of abundance.
+    [`availability()`](https://camilleross.org/dsfit/reference/availability.md)
+    returns `se = NA` when no interval standard errors are given, and
+    [`g0()`](https://camilleross.org/dsfit/reference/g0.md) refuses
+    that.
 
-**It will not join components keyed on different things.** Availability
-by month and perception by year is the common case, and it has no
-correct join: the answer is a value per month-year. Build that cross
-product deliberately.
+3.  **Components must share the same keys.** For example, availability
+    by month and perception by year cannot be joined. Build a value per
+    month-year for both instead.
 
-Under independence the squared CVs add, `CV(g0)² = Σ CV(xᵢ)²`, so the
-least precise component sets the floor. A perception estimate with a 30%
-CV cannot be rescued by an availability estimate with a 2% one.
+If the components are independent, their squared CVs add: CV(g0)² = Σ
+CV(xᵢ)². The least precise component therefore sets the minimum CV. A
+perception estimate with a 30% CV keeps the CV of g(0) at 30% or more,
+however precise availability is.
 
-## Where this stops
+## Where dsfit stops
 
-Divide abundance by `g(0)` and carry its CV through — at the abundance
-step, in the analysis layer, not here. `dsfit` fits detection functions
-and reports what they imply; density surface models and their covariate
-stack live in their own package.
+dsfit fits detection functions, reports what they imply, and builds the
+g(0) correction. Dividing abundance by g(0) and carrying its CV through
+is done at the abundance step, outside this package. dsfit does not
+estimate g(0) itself. See
+[`vignette("availability", package = "dsfit")`](https://camilleross.org/dsfit/articles/availability.md)
+for the details of availability and g(0).
 
-And it does not estimate `g(0)`. Correcting for one component while
-believing you have corrected for another is how these estimates go wrong
-by a factor rather than a percentage, which is why the components are
-named separately all the way through.
+## References
+
+Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what
+there is: estimating North Atlantic right whale *Eubalaena glacialis*
+local abundance. *Endangered Species Research* 38:101-113.
+<https://doi.org/10.3354/esr00938>

@@ -1,26 +1,33 @@
 # Availability and the g(0) correction
 
-`g(0)` is the probability of detecting an animal that is directly on the
-trackline. Every detection function in this package conditions on the
-animal having been available and seen, so `g(0)` is assumed rather than
-estimated — and a mis-specified one shifts every candidate in a model
-set by the same factor, leaving the ranking untouched while the density
-is wrong.
+``` r
 
-This is the reference for the one component dsfit can compute:
-availability, the fraction of time an animal is at the surface and so
-visible from the air. It also covers how to assemble a full correction
-from components that come from elsewhere, and how to record where each
-one came from.
+library(dsfit)
+```
 
-The code here is shown rather than run, so the vignette needs no survey
-data.
+g(0) is the probability of detecting an animal that is directly on the
+trackline. Every detection function dsfit fits assumes g(0) = 1. If the
+true value is lower, every candidate model’s average detection
+probability is too high by the same factor. The AIC ranking does not
+change, so model selection cannot reveal the error.
 
-## Availability
+This vignette is the reference for:
 
+1.  availability, the one component of g(0) that dsfit computes;
+2.  checking a dataset before a sweep, including what it can support;
+3.  assembling a full g(0) correction from components, and recording
+    where each came from.
+
+Sections 2 and 3 use a small simulated survey, defined in Section 2.
+
+## 1. Availability
+
+Availability is the probability that an animal was at the surface, and
+so could be seen, while the observers had its position in view.
 [`availability()`](https://camilleross.org/dsfit/reference/availability.md)
-computes the availability component of `g(0)` — the probability an
-animal was at the surface to be seen while the platform had it in view.
+computes it from the mean surfacing interval, the mean diving interval,
+and the time in view (the window). The intervals below are from
+`example_dive_intervals`, which is invented for demonstration.
 
 ``` r
 
@@ -41,344 +48,424 @@ availability(
 #> 6 May   availability 0.849    NA
 ```
 
-That spread — 0.25 to 0.85 across one season — is the entire argument
-against a constant.
+Availability runs from 0.25 in December to 0.85 in May. One constant
+value for the season would be wrong in most months. `se` is `NA` because
+no standard errors were given for the intervals (Section 1.5).
 
-### The equation
+### 1.1 The equation
 
-Following [Laake et al. (1997)](https://doi.org/10.2307/3802415), for a
-mean surfacing interval `E(s)`, a mean diving interval `E(d)`, and a
-window `w` during which the animal is in view:
+The formula is from Laake et al. (1997). With mean surfacing interval
+`E(s)`, mean diving interval `E(d)`, and window `w`:
 
             E(s) + E(d) · (1 − exp(−w / E(d)))
       a =  ────────────────────────────────────
                       E(s) + E(d)
 
-Two limits are worth holding onto, and both are pinned as tests:
+The term `E(d) · (1 − exp(−w / E(d)))` is the added chance that an
+animal underwater when the window opens surfaces before it closes. Two
+limits follow, and both are checked by the package tests:
 
-- **`w → 0`** — an instantaneous glance. The exponential term vanishes
-  and `a = E(s) / (E(s) + E(d))`, the plain proportion of time spent at
-  the surface.
-- **`w → ∞`** — watch forever, and every animal surfaces eventually, so
-  `a → 1`.
+- As `w → 0` (an instantaneous look), `a = E(s) / (E(s) + E(d))`, the
+  proportion of time spent at the surface.
+- As `w → ∞`, `a → 1`, because every animal surfaces eventually.
 
-The middle term is the extra chance that an animal which was *down* when
-the window opened comes up before it closes. That is why a slower
-aircraft or a wider field of view raises availability without the whales
-changing anything.
+A longer window, from a slower platform or a wider field of view,
+therefore raises availability.
 
-### The window, and a trap in it
+### 1.2 The time-in-view window
 
-An **aircraft observer’s field of view is a wedge running forward and
-aft**, not a circular patch. An animal further off the trackline sits in
-that wedge *longer*, so the window **grows** with perpendicular distance
-— [Ganley et al.](https://doi.org/10.3354/esr00938) measured time in
-view rising from about 50 s near the trackline to about 130 s at 3 km.
+The window depends on the platform’s field of view. dsfit provides two
+geometric models.
+
 [`view_window_aerial()`](https://camilleross.org/dsfit/reference/view_window_aerial.md)
-is that geometry:
+is for an aircraft. The observer’s field of view is a wedge running
+forward and aft of the aircraft. An animal farther from the trackline
+stays in the wedge longer, so the window **increases** with
+perpendicular distance x:
 
-      t(x) = α + x · tan(θ) / v
+      t(x) = α + 2 · x · tan(θ) / v
+
+where α is the time in view at the trackline, θ is the viewing angle
+forward and aft of perpendicular, and v is ground speed. Ganley et
+al. (2019) calibrated this for their aircraft by timing a navigation
+buoy through the field of view: 51.22 s at the trackline, increasing by
+about 0.03 s per metre of perpendicular distance.
 
 [`view_window()`](https://camilleross.org/dsfit/reference/view_window.md)
-is the other case, a genuinely circular viewing area crossed along a
-chord:
+is for a circular viewing area of radius r crossed along a chord:
 
       w(x) = 2 · sqrt(r² − x²) / v
 
-which *narrows* with distance and closes at the edge of view. **Using it
-for an aircraft gets the sign of the distance effect backwards**, which
-is why both exist and why the aerial one is the default worth reaching
-for here. Both are approximations: measuring the window — Ganley et
-al. timed a navigation buoy through the field of view — beats deriving
-it from either.
+This window **decreases** with distance and is zero at the edge of view.
+Using it for an aircraft reverses the direction of the distance effect.
+Both are approximations. A measured window, like Ganley et al.’s, is
+better than either.
 
-### It computes; it does not estimate
+The examples in this vignette use
+[`view_window()`](https://camilleross.org/dsfit/reference/view_window.md)
+with invented intervals, so they demonstrate the functions rather than
+any real platform.
 
-An animal submerged while the aircraft passes is missed at **every
-perpendicular distance equally**. To first order availability is a pure
-scale factor on g(x): it does not dent the near-zero end of the distance
-distribution, does not change its shape, and leaves no signature for a
-likelihood to find. That is the same reason a mis-specified `g(0)`
-shifts every candidate in a selection table by the same factor and
-leaves the ranking looking untouched.
+### 1.3 Why availability is computed, not estimated
 
-So there is nothing in the distances to estimate it from, and **none of
-the inputs come from the survey being corrected**. The intervals come
-from focal follows, tagging or drone work; the window comes from the
-platform. Both arrive with their own uncertainty, which is the point —
-it stays visible instead of being absorbed into a constant.
+An animal underwater while the platform passes is missed at every
+perpendicular distance equally. Availability therefore scales g(x) by a
+constant and does not change the shape of the distance distribution. The
+distances contain no information about it.
 
-### Why it is a function and not a number
+The inputs come from outside the survey being corrected: dive intervals
+from focal follows, tagging or drone work, and the window from the
+platform. Each has its own uncertainty, which is carried into the result
+(Section 1.5).
 
-[Ganley et al. (2019)](https://doi.org/10.3354/esr00938) measured this
-for right whales in Cape Cod Bay with focal follows and the aircraft’s
-field of view: **availability ran from 0.27 in January to 0.91 in
-April**, tracking the depth of the copepod layer the whales were feeding
-on. Those measurements ship as `ganley_availability`. [Roberts et
-al. (2024)](https://doi.org/10.3354/meps14547) arrive at the same place
-from the other direction, correcting perception and availability per
-platform, per team and per conditions across 11 institutions and 2.9
-million km of effort.
+### 1.4 Why availability varies
 
-A single plausible-looking figure is therefore the most dangerous input
-this package accepts. Something like 0.83 sits comfortably inside *both*
-of those ranges, which is exactly what makes it treacherous: it is one
-component’s value under one set of conditions. If availability is ~0.5
-in a given month and perception ~0.7, the combined `g(0)` is **~0.35** —
-using 0.83 there does not overestimate density by a fifth, it
-understates the correction by more than a factor of two. And because it
-scales every candidate equally, no amount of model selection reveals it.
+Ganley et al. (2019) measured availability for right whales in Cape Cod
+Bay from focal follows and the aircraft’s field of view. It ranged from
+0.27 in January to 0.91 in April, following the depth of the copepods
+the whales feed on. Roberts et al. (2024) applied separate perception
+and availability corrections per platform, team and conditions across 11
+institutions.
 
-### The output shape, and the standard error
+A single fixed value is therefore a risky input. For example, if
+availability is about 0.5 in a month and perception about 0.7, g(0) is
+about 0.35. Using a fixed 0.83 instead understates the correction by
+more than a factor of two, and model selection cannot reveal the error.
 
-The result is a `key` / `component` / `value` / `se` table — the shape a
-`g(0)` correction stacks from, so availability rows and perception rows
-sit together and it stays visible which have been applied.
+### 1.5 The output and its standard error
 
-Availability is deterministic given its inputs, so its uncertainty comes
-from them: pass `se_surface` and `se_dive` and they propagate by delta
-method. Passing one without the other is an **error**, not a
-half-propagated variance — reporting a standard error smaller than the
-truth is worse than reporting none. Passing neither gives `se = NA`
-rather than an invented precision, because this is the quantity whose CV
-routinely dominates the CV of abundance.
+[`availability()`](https://camilleross.org/dsfit/reference/availability.md)
+returns a table with columns `key`, `component`, `value` and `se`. This
+is the format [`g0()`](https://camilleross.org/dsfit/reference/g0.md)
+takes, so availability and perception rows can be stacked.
 
-Where the raw focal follows are in hand, bootstrapping them beats this,
-since it does not assume the interval means are jointly normal. That is
-what Ganley did.
+Availability is a fixed function of its inputs, so its uncertainty comes
+from them. Pass `se_surface` and `se_dive` and the standard errors are
+propagated by the delta method.
 
-### Three datasets, and which are real
+- Passing only one of them is an error, because propagating one and
+  dropping the other would understate the standard error.
+- Passing neither gives `se = NA`. A made-up precision is not supplied.
 
-`ganley_availability` is **real and cited** — Table S1 of Ganley et
-al. (2019), complete: mean dive and surface intervals, percent surface
-time, and measured availability from 86 focal follows in Cape Cod Bay.
+If the raw focal-follow data are available, bootstrapping them is better
+than the delta method, because it does not assume the interval means are
+jointly normal. Ganley et al. (2019) bootstrapped.
 
-| month | % surface | dive (s) | surface (s) | a(x)     |
-|-------|-----------|----------|-------------|----------|
-| Jan   | 16        | 533      | 48          | **0.27** |
-| Feb   | 34        | 256      | 226         | 0.52     |
-| Mar   | 31        | 219      | 67          | 0.52     |
-| Apr   | 55        | 88       | 801         | **0.91** |
+### 1.6 The bundled datasets
 
-A **threefold swing across one season**, in measurements rather than
-argument.
+| dataset | source | contents |
+|----|----|----|
+| `ganley_availability` | Ganley et al. (2019), Table S1 | mean dive and surface intervals, percent surface time and availability by month, from 86 focal follows in Cape Cod Bay |
+| `ganley_detection` | Ganley et al. (2019), Table S2 | 20 years of annual detection-function results from one programme and aircraft |
+| `example_dive_intervals` | invented | intervals with standard errors, to demonstrate the functions |
 
-`ganley_detection` is Table S2: twenty years of annual detection
-functions from one programme, one aircraft, one bay, with `p` between
-0.431 and 0.866 and standard errors spanning an order of magnitude. Its
-columns line up with
-[`selection_table()`](https://camilleross.org/dsfit/reference/selection_table.md)’s.
-It is `p`, **not** perception bias — Ganley et al. state they did not
-estimate perception, since it needs a second observer team.
+`ganley_availability`:
 
-`example_dive_intervals` is **invented**, and labelled so wherever it
-appears. It exists to demonstrate the API including standard errors.
+| month | % surface | dive (s) | surface (s) | availability |
+|-------|-----------|----------|-------------|--------------|
+| Jan   | 16        | 533      | 48          | 0.27         |
+| Feb   | 34        | 256      | 226         | 0.52         |
+| Mar   | 31        | 219      | 67          | 0.52         |
+| Apr   | 55        | 88       | 801         | 0.91         |
 
-**Three traps in Table S1**, documented rather than smoothed over,
-because each is an inviting mistake:
+`ganley_detection` has `p` between 0.431 and 0.866. Its `p`, `p_se` and
+`cvm_p` columns match those in
+[`selection_table()`](https://camilleross.org/dsfit/reference/selection_table.md).
+Its `p` is the average detection probability, not perception bias.
+Ganley et al. did not estimate perception, which needs a second observer
+team.
 
-- `percent_surface_time` is **not** `E(s)/(E(s)+E(d))`. January is
-  listed at 16% while its own intervals give `48/(48+533)` = 8.3%; April
-  is listed at 55% against 90%. The percentage is a mean of per-follow
-  percentages, the intervals are means of intervals, and a mean of
-  ratios is not a ratio of means. This package asserted the identity
-  until the table arrived; there is now a test asserting it is false.
-- The `availability` figures are bootstrap medians, evaluated at no
-  common window — January’s implies about two minutes in view, April’s a
-  few seconds.
+Three points about Table S1 that are easy to get wrong:
+
+- `percent_surface_time` is not `E(s) / (E(s) + E(d))`. For January the
+  intervals give 48 / (48 + 533) = 8.3%, but the table lists 16%. For
+  April they give 90% against 55%. The percentage is a mean of
+  per-follow percentages, while the intervals are means of intervals,
+  and the two need not agree. A package test checks that they do not.
+- The `availability` values are bootstrap medians and were not computed
+  at a common window.
   [`availability()`](https://camilleross.org/dsfit/reference/availability.md)
-  will not reproduce them, and is not meant to.
-- The variance column is ambiguous. Read literally, January’s SE is
-  `√0.04 = 0.2` against an estimate of 0.27, a CV of 74%; read as a
-  standard error, 15%. Neither matches the error bars in the paper’s own
-  figure, so it ships unconverted under the paper’s label and
-  [`g0()`](https://camilleross.org/dsfit/reference/g0.md) makes you
-  decide.
+  will not reproduce them.
+- The `availability_variance` column is ambiguous. Read as a variance,
+  January’s standard error is √0.04 = 0.2, a CV of 74%. Read as a
+  standard error, the CV is 15%. Neither matches the error bars in the
+  paper’s figure. The column is kept as published, and you must decide
+  how to use it before passing it to
+  [`g0()`](https://camilleross.org/dsfit/reference/g0.md).
 
-## Before you sweep
+## 2. Checking data before a sweep
 
 [`diagnose_sweep()`](https://camilleross.org/dsfit/reference/diagnose_sweep.md)
-runs the guards, the truncation and the model-set expansion — never
-[`mrds::ddf()`](https://rdrr.io/pkg/mrds/man/ddf.html) — and reports the
-common ways a sweep goes wrong before it reaches the fitting:
+runs the checks that
+[`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md)
+runs before fitting: the data checks, truncation, and model-set
+expansion. It never calls
+[`mrds::ddf()`](https://rdrr.io/pkg/mrds/man/ddf.html).
+
+The simulated survey has 300 detections from a half-normal detection
+function whose scale decreases with Beaufort sea state, plus 20 rows
+with no distance. Rows with no distance record samples with no
+detections.
+
+``` r
+
+set.seed(1)
+n <- 300
+detections <- data.frame(
+  object   = 1:n,
+  beaufort = sample(0:4, n, replace = TRUE)
+)
+detections$distance <- abs(rnorm(n, 0, 900 - 90 * detections$beaufort))
+detections <- rbind(detections,
+                    data.frame(object = n + 1:20, beaufort = NA, distance = NA))
+```
 
 ``` r
 
 diagnose_sweep(detections, model_set(c("hn", "hr")), truncation = 2500)
 #> dsfit sweep diagnosis
-#>
+#> 
 #> == Toolchain ==
 #>   ok    mrds 3.0.1 is installed
-#>
+#> 
 #> == Data ==
-#>   ok    1999 rows, 1999 exact distances
-#>   note  estimate perception bias: no double-observer structure
-#>
+#>   ok    320 rows, 300 exact distances
+#>   note  estimate perception bias: no double-observer structure: no `observer` or `detected` column
+#>   note  carry group size to abundance: no `size` column; abundance would count groups, not individuals
+#> 
 #> == Truncation ==
-#>   ok    1999 of 2050 rows kept at truncation 2500
-#>         dropped: 12 with no distance, 39 beyond the truncation
-#>   ok    1999 detections is at or above the 60-80 usually suggested
-#>
+#>   ok    299 of 320 rows kept at truncation 2500
+#>         dropped: 20 with no distance, 1 beyond the truncation
+#>   ok    299 detections is at or above the 60-80 usually suggested
+#> 
 #> == Model set ==
 #>   ok    2 candidates: hn, hr
-#>   WARN  no detections inside 100.1, which is 4% of the truncation width, and
-#>         neither `left` nor the gamma key is in use...
-#>
+#> 
 #> == What is still assumed ==
 #>   g(0) = 1, unless a correction is applied at the abundance step.
+#>   Nothing here can detect a wrong one: it scales every candidate
+#>   equally, so the ranking looks untouched. See ?g0.
+#> 
+#> No problems found. Nothing was fitted.
 ```
 
-It catches the things that otherwise surface as a cryptic error from
-inside `mrds`, or as a table that looks fine: a covariate formula naming
-a column that is not there, a truncation dropping most of the survey
-(usually a units mismatch), a constant or `NA`-riddled covariate, a
-model set counting the blind spot twice.
+It reports problems that would otherwise appear as an error from inside
+`mrds`, or not at all:
 
-Two distinctions it makes deliberately. **Absent structure is noted,
-ambiguous structure is warned about** — a survey that had one observer
-team is not misconfigured, and saying so as a warning on every dataset
-would bury the cases that are. And the blind-spot check asks two
-questions rather than one: is the empty near strip *wide against the
-truncation* (not merely non-zero, which every continuous distance is),
-and does the distribution **begin abruptly or rise into itself**? A
-geometric cutoff is a discontinuity, so detections start near their peak
-rate; a real decline toward the trackline ramps up, which is the shape
-gamma is for. No key function is discontinuous, so against a hard edge
-gamma misfits like the rest — and the diagnosis says so instead of
-calling the spot handled.
+- a covariate formula naming a column that is not in the data;
+- a truncation that drops most of the data, which usually means a units
+  mismatch;
+- a covariate that is constant or has missing values;
+- a model set that handles the blind spot twice (gamma key with `left`).
 
-## What your data can and cannot support
+Missing structure, such as having only one observer team, is reported as
+a `note`, not a warning. A single-observer survey is not misconfigured,
+and warning on every such dataset would hide the real problems.
+
+The blind-spot check asks two questions. First, is the gap between the
+trackline and the nearest detection wide compared with the truncation
+distance? Second, does the number of detections start abruptly at the
+edge of the gap, or rise gradually? An abrupt start indicates a hard
+cutoff, which no key function can fit, including gamma; left truncation
+is then the right treatment. A gradual rise is the shape the gamma key
+is for.
+
+## 3. What the data can support
 
 [`detection_structure()`](https://camilleross.org/dsfit/reference/detection_structure.md)
-reads a table of detections and reports which analyses it admits —
-before anything is fitted:
+reports which analyses a table of detections supports, before anything
+is fitted.
 
 ``` r
 
 detection_structure(detections)
 #> <dsfit_structure>
-#>   200 rows, 200 exact distances
-#>   nearest detection at 0.1326 - a blind spot beneath the platform would show here
-#>
+#>   320 rows, 300 exact distances
+#>   nearest detection at 3.167 - a blind spot beneath the platform would show here
+#> 
 #>   can:
-#>     fit a detection function        200 exact distances; at or above the 60-80 usually suggested
+#>     fit a detection function        300 exact distances; at or above the 60-80 usually suggested
 #>     test fit with Cramer-von Mises  exact distances have an empirical distribution to test
-#>     fit covariate models            candidates: beaufort
-#>
+#>     test fit with chi-square        over cutpoints mrds chooses, which makes it the weaker test here
+#>     fit covariate models            candidates: beaufort; recorded as survey conditions: beaufort
+#> 
 #>   cannot:
-#>     estimate perception bias  no double-observer structure: no `observer` or
-#>                               `detected` column. Perception needs two independent
-#>                               teams and cannot be recovered from a single-observer
-#>                               survey at any sample size
-#>     estimate availability     not estimable from distances by construction...
+#>     estimate perception bias       no double-observer structure: no `observer` or `detected` column. Perception needs two independent teams and cannot be recovered from a single-observer survey at any sample size
+#>     estimate availability          not estimable from distances by construction: a submerged animal is missed at every distance equally. Compute it from dive data with availability()
+#>     carry group size to abundance  no `size` column; abundance would count groups, not individuals
+#> 
+#>   Structure only. That something is supported is not a reason to do it.
 ```
 
-Most of what decides whether an analysis is possible is structural, and
-none of it is announced by the data. Whether a survey ran two
-independent observer teams decides whether perception bias is estimable
-at all — and that is a property of the **survey programme**, not of the
-archive its data ends up in, so a pooled extract may or may not carry
-it.
+Whether perception bias can be estimated depends on whether the survey
+programme ran two independent observer teams. The data do not announce
+this, and a pooled archive extract may or may not keep the structure.
+Fitting a single-observer dataset and reporting it as if perception had
+been corrected gives a number that is wrong by a factor.
 
-The failure this guards against is not an error but a silence: fitting a
-single-observer dataset and reporting it as though perception had been
-handled. That produces a number, and the number is wrong by a factor. A
-third verdict, `partly`, catches the shape that most invites the mistake
-— an `observer` column with no `detected` indicator, which looks like
-double-observer data and is not.
+Each analysis is reported as supported, not supported, or `partly`.
+`partly` covers incomplete double-observer structure, for example an
+`observer` column with no `detected` column, which looks like
+double-observer data but is not.
 
-It reports;
-[`prepare_distance_data()`](https://camilleross.org/dsfit/articles/R/prepare.R)
-enforces. One is a briefing, the other is a gate.
+[`detection_structure()`](https://camilleross.org/dsfit/reference/detection_structure.md)
+only reports.
+[`prepare_distance_data()`](https://camilleross.org/dsfit/reference/prepare_distance_data.md),
+which
+[`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md)
+calls, enforces the checks with errors.
 
-## Assembling a g(0) correction
+## 4. Assembling a g(0) correction
 
-[`g0()`](https://camilleross.org/dsfit/reference/g0.md) stacks the
-components, multiplies them, and propagates their variance:
+[`g0()`](https://camilleross.org/dsfit/reference/g0.md) combines the
+components by multiplying them and propagates their standard errors.
 
 ``` r
 
+avail <- availability(
+  surface    = example_dive_intervals$surface,
+  dive       = example_dive_intervals$dive,
+  window     = view_window(radius = 300, speed = 50),
+  se_surface = example_dive_intervals$se_surface,
+  se_dive    = example_dive_intervals$se_dive,
+  key        = as.character(example_dive_intervals$month)
+)
+avail$source <- "example intervals - invented"
+
+perception <- data.frame(
+  key = NA, component = "perception", value = 0.68, se = 0.09,
+  source = "AMAPPS double-observer, borrowed - not measured on this survey"
+)
+
 g0(avail, perception)
 #> <dsfit_g0>
-#>   components:  availability, perception
-#>
+#>   components:
+#>     availability  example intervals - invented
+#>     perception    AMAPPS double-observer, borrowed - not measured on this survey
+#> 
 #>  key     g0     se    cv
-#>  Dec 0.2814 0.0505 0.180
-#>  Jan 0.3132 0.0545 0.174
-#>  Feb 0.3668 0.0610 0.166
-#>  Mar 0.4445 0.0690 0.155
-#>  Apr 0.5679 0.0798 0.140
-#>  May 0.6466 0.0866 0.134
-#>
+#>  Dec 0.1666 0.0344 0.206
+#>  Jan 0.1946 0.0390 0.201
+#>  Feb 0.2457 0.0462 0.188
+#>  Mar 0.3242 0.0558 0.172
+#>  Apr 0.4645 0.0696 0.150
+#>  May 0.5776 0.0799 0.138
+#> 
 #>   Divide abundance by g0, and propagate cv. This package does not
 #>   apply it: correction happens at the abundance step.
 ```
 
-It **builds an object and hands it off** rather than applying anything.
-This package fits detection functions; it does not compute abundance,
-and the correction belongs one layer out where density is calculated.
-What it can do from here is make the correction impossible to get wrong
-quietly:
+The perception row has `key = NA`, so it applies to every month.
 
-- **Never silently 1.** No default, and an absent component is named —
-  in a warning when you build it, and again every time the object
-  prints:
+[`g0()`](https://camilleross.org/dsfit/reference/g0.md) returns an
+object; it does not apply the correction. dsfit fits detection functions
+and does not compute abundance. The correction is applied where
+abundance is calculated.
+[`g0()`](https://camilleross.org/dsfit/reference/g0.md) enforces these
+rules:
 
-      <dsfit_g0>
-        components:  availability
-        assumed 1:   perception
+- **No silent default of 1.** A missing component is named in a warning
+  when the object is built, and every time it prints:
 
-- **Propagate the variance or refuse.** A component without a standard
-  error is an error. That meets
-  [`availability()`](https://camilleross.org/dsfit/reference/availability.md)’s
-  refusal to invent one, so the two rules close the loop: it will not
-  make up a precision, and this will not accept none.
+  ``` r
 
-- **Name the components separately**, so it stays visible which have
-  been applied. An unnamed component is an error.
+  g0(avail)
+  #> <dsfit_g0>
+  #>   assumed 1:   perception
+  #>   components:
+  #>     availability  example intervals - invented
+  #> 
+  #>  key     g0     se    cv
+  #>  Dec 0.2450 0.0388 0.158
+  #>  Jan 0.2861 0.0431 0.151
+  #>  Feb 0.3613 0.0483 0.134
+  #>  Mar 0.4767 0.0525 0.110
+  #>  Apr 0.6831 0.0481 0.070
+  #>  May 0.8494 0.0339 0.040
+  #> 
+  #>   Divide abundance by g0, and propagate cv. This package does not
+  #>   apply it: correction happens at the abundance step.
+  ```
 
-### Recording where a component came from
+- **Every component needs a standard error.** A component with `se = NA`
+  is an error. Together with
+  [`availability()`](https://camilleross.org/dsfit/reference/availability.md)
+  returning `NA` rather than inventing a standard error, this means a
+  correction never carries an unstated precision.
 
-Components take an optional `source`, and perception is the reason to
-use it.
+- **Every component needs a name** in the `component` column, so it is
+  clear which have been applied.
 
-Estimating perception needs two independent observer teams, and whether
-a survey programme ran them is a property of that programme rather than
-of the archive its data lands in. A NARWC extract may or may not carry
-the structure, so for many datasets the only available perception
-estimate is one **borrowed from a different programme**. Roberts et
-al. did exactly that — perception was estimable only from NOAA’s AMAPPS
-surveys, and they applied those corrections to the other ten
-institutions’ data, cautioning in print that it may have biased their
-density estimates.
+- **All keyed components must have the same keys.** Components keyed on
+  different things are rejected. For example, availability by month and
+  perception by year cannot be joined. Key both on month-year instead.
 
-A borrowed correction that looks local is the failure this guards
-against, so `source` is printed every time and anything missing one is
-named:
+### 4.1 Recording where a component came from
 
-    <dsfit_g0>
-      components:
-        availability  focal follows, this survey
-        perception    AMAPPS double-observer, borrowed - not measured on this survey
+Each component can have a `source` column. It is most useful for
+perception.
 
-    <dsfit_g0>
-      assumed 1:   perception
-      components:
-        availability  source not recorded
+Estimating perception needs two independent observer teams. Many survey
+programmes did not run them, so the only available perception estimate
+is often borrowed from another programme. Roberts et al. (2024) did
+this: perception was estimable only from NOAA’s AMAPPS surveys, and they
+applied those estimates to data from the other ten institutions, noting
+that this may have biased their density estimates.
 
-Components combine multiplicatively and independently, which gives a
-rule worth remembering — **squared CVs add**:
+`source` is printed with every
+[`g0()`](https://camilleross.org/dsfit/reference/g0.md) result, as in
+the output above. A component without one is shown as
+`source not recorded`:
+
+``` r
+
+avail$source <- NULL
+g0(avail)
+#> <dsfit_g0>
+#>   assumed 1:   perception
+#>   components:
+#>     availability  source not recorded
+#> 
+#>  key     g0     se    cv
+#>  Dec 0.2450 0.0388 0.158
+#>  Jan 0.2861 0.0431 0.151
+#>  Feb 0.3613 0.0483 0.134
+#>  Mar 0.4767 0.0525 0.110
+#>  Apr 0.6831 0.0481 0.070
+#>  May 0.8494 0.0339 0.040
+#> 
+#>   Divide abundance by g0, and propagate cv. This package does not
+#>   apply it: correction happens at the abundance step.
+```
+
+### 4.2 How the CVs combine
+
+The components are assumed independent and are multiplied, so their
+squared coefficients of variation (CV, standard error divided by
+estimate) add:
 
       CV(g0)² = Σ CV(xᵢ)²
 
-So the least precise component sets the floor. A perception estimate
-with a 30% CV cannot be rescued by an availability estimate with a 2%
-one, and the table above shows why the `cv` column deserves as much
-attention as `g0`.
+The least precise component therefore sets the minimum CV. A perception
+estimate with a 30% CV keeps the CV of g(0) at 30% or more, however
+precise availability is. In the `g0(avail, perception)` output above,
+perception alone contributes a CV of 0.09 / 0.68 = 0.13, and the `cv`
+column never falls below it.
 
-One refusal worth knowing: components keyed on **different things** are
-rejected rather than joined. Availability by month and perception by
-year is the usual way to get there, and it has no correct join — the
-answer is a value per month-year, so build that cross product and key
-both components on it. Pairing January with 1998 because both come first
-would be silent nonsense.
+## References
+
+Ganley, L.C., Brault, S. and Mayo, C.A. (2019) What we see is not what
+there is: estimating North Atlantic right whale *Eubalaena glacialis*
+local abundance. *Endangered Species Research* 38:101-113.
+<https://doi.org/10.3354/esr00938>
+
+Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997)
+Probability of detecting harbor porpoise from aerial surveys: estimating
+g(0). *The Journal of Wildlife Management* 61:63-75.
+<https://doi.org/10.2307/3802415>
+
+Roberts, J.J., Yack, T.M., Fujioka, E., Halpin, P.N., Baumgartner, M.F.
+and others (2024) North Atlantic right whale density surface model for
+the US Atlantic evaluated with passive acoustic monitoring. *Marine
+Ecology Progress Series* 732:167-192.
+<https://doi.org/10.3354/meps14547>

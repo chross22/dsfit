@@ -1,7 +1,7 @@
 # Right whale annual detection probability in Cape Cod Bay
 
-Table S2 of Ganley et al. (2019): the goodness-of-fit and average
-detection probability of a separately fitted detection function for each
+Table S2 of Ganley et al. (2019): goodness-of-fit p-values and average
+detection probability for a detection function fitted separately to each
 year from 1998 to 2017, from aerial line-transect surveys of Cape Cod
 Bay.
 
@@ -43,38 +43,31 @@ local abundance. *Endangered Species Research* 38:101-113.
 [doi:10.3354/esr00938](https://doi.org/10.3354/esr00938) , Table S2.
 Open access under CC-BY.
 
-## This is `p`, not perception bias
+## This is `p`, not perception
 
-`p` here is the average detection probability of the fitted detection
-function — the same quantity
+`p` is the average detection probability of the fitted detection
+function, the same quantity
 [`selection_table()`](https://camilleross.org/dsfit/reference/selection_table.md)
-reports as `p`, with its standard error as `p_se`. It is **not** a
-`g(0)` component. Ganley et al. say so directly: perception bias "was
-not addressed directly in this study", because estimating it needs a
-second observer team they did not have.
+reports as `p` (with standard error `p_se`). It is not a `g(0)`
+component. Ganley et al. state that perception bias was not addressed in
+their study, because estimating it needs a second observer team.
+Correcting for one while believing you have corrected for the other
+biases abundance by a factor.
+[`g0()`](https://camilleross.org/dsfit/reference/g0.md) names any
+standard component that is missing.
 
-The distinction matters because the two are easy to conflate and
-correcting for one while believing you have corrected for the other is
-how these estimates go wrong by a factor. See
-[`g0()`](https://camilleross.org/dsfit/reference/g0.md), which will name
-any component you have not supplied.
+## What it is useful for
 
-## What it is good for
+It is a long, real example that detection probability is not a constant
+of a survey. Twenty years of the same programme, aircraft and bay give
+`p` between 0.431 and 0.866, with standard errors from 0.028 to 0.333.
 
-It is a long, real example of the thing
-[`sweep_models()`](https://camilleross.org/dsfit/reference/sweep_models.md)
-is built around: **detection probability is not a constant of the
-survey**. Twenty years of the same programme, the same aircraft and the
-same bay give `p` between 0.431 and 0.866 — a twofold range — with
-standard errors spanning an order of magnitude, from 0.028 to 0.333.
-
-The goodness-of-fit columns are worth reading next to it. Ganley et al.
-took p \> 0.05 as adequate fit, and 2003 fails on Kolmogorov-Smirnov
-(0.048) while passing Cramér-von Mises (0.103); it also carries much the
-largest standard error on `p`. A model can top a ranking and still fail
-a fit test, which is why
+The goodness-of-fit columns show that a model can rank well and still
+fail a fit test. Ganley et al. took p \> 0.05 as adequate fit. 2003
+fails Kolmogorov-Smirnov (0.048) but passes Cramér-von Mises (0.103),
+and has the largest standard error on `p`. This is why
 [`selection_table()`](https://camilleross.org/dsfit/reference/selection_table.md)
-carries `cvm_p` alongside the AIC.
+reports `cvm_p` alongside AIC.
 
 ## See also
 
@@ -109,11 +102,11 @@ ganley_detection
 #> 19  2016 0.115 0.065 0.431 0.038
 #> 20  2017 0.341 0.129 0.518 0.028
 
-# Detection probability is not a constant of a survey programme
+# Detection probability varies from year to year
 range(ganley_detection$p)
 #> [1] 0.431 0.866
 
-# The year that fails Kolmogorov-Smirnov also has the worst precision on p
+# The year that fails Kolmogorov-Smirnov also has the least precise p
 ganley_detection[ganley_detection$ks_p < 0.05, ]
 #> # A tibble: 1 × 5
 #>    year cvm_p  ks_p     p  p_se

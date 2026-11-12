@@ -1,10 +1,11 @@
-# The time an animal stays in view of a vessel
+# Time in view for a vessel
 
-The window
+Computes the `window` for
 [`availability()`](https://camilleross.org/dsfit/reference/availability.md)
-needs, for observers searching a forward arc from a ship: a sector ahead
-of the bow, which a point on the water enters when it comes inside the
-search angle and leaves when it draws abeam.
+for observers on a ship who search a sector ahead of the bow. The window
+runs from the moment the animal crosses the search radius to the moment
+its bearing passes the edge of the search angle (abeam, for a full
+forward search).
 
 ## Usage
 
@@ -18,78 +19,76 @@ view_window_ship(radius, speed, angle = 90, distance = 0)
 
 - radius:
 
-  Effective search radius ahead of the vessel, in metres.
+  Numeric. Effective search radius ahead of the vessel, in metres. Must
+  be positive.
 
 - speed:
 
-  Vessel speed over ground, in metres per second.
+  Numeric. Vessel speed over ground, in metres per second. Must be
+  positive.
 
 - angle:
 
-  Search half-angle from the bow, in **degrees**. `90` (default) is a
-  full beam-to-beam forward search; a narrower arc is narrower.
+  Numeric. Search half-angle from the bow, in degrees. Default `90`, a
+  full beam-to-beam forward search. Must be above 0 and at most 90.
 
 - distance:
 
-  Perpendicular distance, in metres. `0` (default) is on the trackline,
-  which gives the widest window.
+  Numeric. Perpendicular distance, in metres. Default `0`, the
+  trackline, which gives the widest window. Must not be negative.
 
 ## Value
 
-A numeric vector of window durations in seconds, `0` where the animal is
-never inside the searched sector.
+A numeric vector of windows in seconds, `0` where the animal is never
+inside the searched sector. `view_window_ship()` is an alias.
 
-## Why a ship is neither of the other two
+## Which platform this fits
 
-[`view_window()`](https://camilleross.org/dsfit/reference/view_window.md)
-is a circular patch, watched fore and aft alike, so its window is the
-full chord.
-[`view_window_aerial()`](https://camilleross.org/dsfit/reference/view_window_aerial.md)
-is a wedge through a side window, so its window *grows* with
-perpendicular distance. A shipboard observer does neither: the search is
-**forward only**. Behind the beam there is nothing to see that has not
-already been counted, and a survey that counted it would be counting the
-same animal twice.
+A ship's observers search forward only. An animal behind the beam has
+already been passed, and counting it would count it twice. This differs
+from
+[`view_window()`](https://camilleross.org/dsfit/reference/view_window.md),
+which watches a full circle, and from
+[`view_window_aerial()`](https://camilleross.org/dsfit/reference/view_window_aerial.md),
+whose window grows with perpendicular distance.
 
-So the window runs from the moment the animal enters the searched sector
-to the moment it draws abeam, and no further. For a search radius \\r\\,
-a search half-angle \\\theta\\ measured from the bow, a speed \\v\\ and
-a perpendicular distance \\x\\:
+## How it works
+
+For a search radius \\r\\, a search half-angle \\\theta\\ measured from
+the bow, speed \\v\\ and perpendicular distance \\x\\:
 
 \$\$w(x) = \frac{\sqrt{r^2 - x^2} - x/\tan\theta}{v}\$\$
 
-The first term is where the animal crosses the radius; the second is
-where it crosses the edge of the search angle. Whichever it meets later
-is where the window opens, so the window is zero when the second exceeds
-the first — an animal too far off the bow to be searched before it
-passes.
+1.  The animal crosses the search radius when it is \\\sqrt{r^2 - x^2}\\
+    ahead of the vessel (zero if \\x \> r\\).
 
-At `angle = 90` the sector is the full forward half-disc,
-\\x/\tan\theta\\ is zero, and the window is exactly **half**
+2.  Its bearing passes the edge of the search angle when it is
+    \\x/\tan\theta\\ ahead. At `angle = 90` this is set to exactly zero
+    (abeam).
+
+3.  The window is the track between the two, divided by speed, and `0`
+    when the second point is further ahead than the first.
+
+At `angle = 90` the window is exactly half of
 [`view_window()`](https://camilleross.org/dsfit/reference/view_window.md)'s:
-same chord, half of it aft of the beam and never searched.
+the same chord, with the aft half never searched.
 
-## Calibrating it, rather than deriving it
+## Calibrating the inputs
 
-The same caution applies as for an aircraft. `radius` is an *effective*
-search radius — how far the observers were actually detecting, not how
-far the big-eyes reach — and it is worth measuring rather than assuming.
-A truncation distance from the fitted detection function is a better
-starting point than a nominal one.
-
-Nothing here corrects for a ship's own effect on the animals. Vessel
-avoidance and attraction both move animals before they are counted, and
-neither is an availability problem: availability asks whether an animal
-that was there surfaced in time to be seen. See
-[`g0()`](https://camilleross.org/dsfit/reference/g0.md) for where the
+`radius` is the effective search radius, the distance at which observers
+actually detected animals, not the reach of the binoculars. A truncation
+distance from the fitted detection function is a better starting point
+than a nominal one. This window does not correct for animals moving
+toward or away from the ship before detection; that is not an
+availability problem. See
+[`g0()`](https://camilleross.org/dsfit/reference/g0.md) for how
 components combine.
 
 ## References
 
 Buckland, S.T., Anderson, D.R., Burnham, K.P., Laake, J.L., Borchers,
 D.L. and Thomas, L. (2001) *Introduction to Distance Sampling.* Oxford
-University Press. Shipboard line transect search geometry, and why the
-search is forward of the beam.
+University Press. Shipboard search geometry, forward of the beam.
 
 Laake, J.L., Calambokidis, J., Osmek, S.D. and Rugh, D.J. (1997)
 Probability of detecting harbor porpoise from aerial surveys: estimating
@@ -102,9 +101,9 @@ formula this window feeds.
 [`availability()`](https://camilleross.org/dsfit/reference/availability.md)
 for what the window feeds,
 [`view_window_aerial()`](https://camilleross.org/dsfit/reference/view_window_aerial.md)
-for an aircraft's forward-and-aft wedge, and
+for an aircraft, and
 [`view_window()`](https://camilleross.org/dsfit/reference/view_window.md)
-for a circular patch.
+for a circular area.
 
 ## Examples
 
@@ -113,18 +112,17 @@ for a circular patch.
 view_window_vessel(radius = 6000, speed = 5.1)
 #> [1] 1176.471
 
-# The window closes as the animal approaches the edge of the sector
+# The window shrinks with perpendicular distance and is 0 beyond the radius
 view_window_vessel(radius = 6000, speed = 5.1,
                    distance = c(0, 2000, 5000, 7000))
 #> [1] 1176.4706 1109.1871  650.3186    0.0000
 
-# A narrower search arc loses the animals furthest off the bow first
+# A narrower search arc shortens the window more at larger distances
 view_window_vessel(radius = 6000, speed = 5.1, angle = 45,
                    distance = c(0, 2000, 5000))
-#> [1] 1176.4706 1109.1871  650.3186
+#> [1] 1176.4706  717.0302    0.0000
 
-# A full forward search is half a circular patch: the aft half is never
-# searched
+# A full forward search gives half the circular window
 view_window_vessel(radius = 300, speed = 50) == view_window(300, 50) / 2
 #> [1] TRUE
 ```

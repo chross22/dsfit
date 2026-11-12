@@ -2,8 +2,9 @@
 
 Fits every candidate in a
 [`model_set()`](https://camilleross.org/dsfit/reference/model_set.md) to
-the same data, at the same truncation, and returns a selection table
-ranked on more than AIC.
+the same data at the same truncation, using
+[`mrds::ddf()`](https://rdrr.io/pkg/mrds/man/ddf.html), and returns a
+selection table. Use it to choose a detection function for a survey.
 
 ## Usage
 
@@ -22,107 +23,144 @@ sweep_models(
 
 - data:
 
-  A data frame with one row per detection. Needs `distance` for exact
-  distances, or `distbegin` and `distend` for binned ones. The flatfile
-  from `distsamp::detection_data()` is this shape; rows with no
-  detection are dropped here.
+  Data frame with one row per detection. Needs a `distance` column for
+  exact distances, or `distbegin` and `distend` for binned ones. The
+  flatfile from `distsamp::detection_data()` has this shape. Rows with
+  no distance (samples without a detection) are dropped.
 
 - models:
 
   A
-  [`model_set()`](https://camilleross.org/dsfit/reference/model_set.md),
-  or `NULL` for the default set.
+  [`model_set()`](https://camilleross.org/dsfit/reference/model_set.md).
+  `NULL` (default) uses
+  [`model_set()`](https://camilleross.org/dsfit/reference/model_set.md).
 
 - truncation:
 
-  Right truncation distance. Required: it defines the data every model
-  in the sweep is fitted to.
+  Number. Right truncation distance, in the units of the distances.
+  Required, with no default.
 
 - left:
 
-  Left truncation distance, for a platform that cannot see beneath
-  itself. `NULL` (default) for none.
+  Number. Left truncation distance, for a platform that cannot see
+  beneath itself. `NULL` (default) for none.
 
 - breaks:
 
-  Bin cutpoints, for binned data. Taken from `distbegin`/ `distend` when
-  not given.
+  Numeric vector of bin cutpoints, for binned data. `NULL` (default)
+  derives them from `distbegin` and `distend`. Ignored, with a warning,
+  for exact distances.
 
 - quiet:
 
-  Suppress the progress and failure report. Default `FALSE`.
+  Logical. `TRUE` suppresses the summary message. Default `FALSE`.
 
 ## Value
 
-An object of class `dsfit_sweep`: a list with `table` (the selection
-table), `fits` (the `ddf` objects, named by `model_id`), and `settings`.
+An object of class `dsfit_sweep`, a list with:
 
-## Why truncation is one argument and not a column
+- `table`:
 
-AIC compares models fitted to the same data. Changing the truncation
-changes which detections are in the likelihood, so AICs either side of
-that are not on the same scale and ranking them together is meaningless.
+  The selection table, one row per candidate including failures. See
+  [`selection_table()`](https://camilleross.org/dsfit/reference/selection_table.md)
+  for the columns.
 
-Truncation is therefore a single value for a whole sweep, by
-construction. To compare truncations, run a sweep for each and compare
-the *sweeps* — which is a different question, answered by looking at
-whether the chosen model and its `p̄` are stable, not by reading one AIC
-column.
+- `fits`:
 
-## Read `p_cv` and `esw`, not just `delta_aic`
+  List of `ddf` objects named by `model_id`. `NULL` for a candidate that
+  failed.
 
-What propagates into abundance is the effective strip half-width. Two
-models within 2 AIC of one another can imply materially different values
-of it, and the difference goes straight into density. The table
-therefore carries `p` (average detection probability), its standard
-error and CV, and `esw` alongside the AIC, and
-[`selection_table()`](https://camilleross.org/dsfit/reference/selection_table.md)
-sorts on AIC only because something has to be first.
+- `settings`:
 
-A goodness-of-fit statistic is reported too, whose null is that the
-fitted function describes the observed distances. A small p-value is
-evidence against the model, and a model can be top of the AIC ranking
-and still fail it.
+  List with `truncation`, `left`, `binned`, `breaks`, `n` (detections
+  fitted), `n_dropped` (rows removed during preparation) and `failures`
+  (first line of the error, or `"did not converge"`, named by
+  `model_id`).
 
-Which test to read follows the data rather than a preference. Exact
-distances get Cramér-von Mises (`cvm_p`), which tests their empirical
-distribution directly. Binned distances have no such distribution, and
-get a chi-square over the survey's own bins (`chisq_p`) — without which
-a binned sweep would carry no goodness-of-fit at all. `chisq_p` is
-filled in for exact fits too, but over cutpoints `mrds` chooses; a test
-whose result moves with an arbitrary binning is the weaker one, and
-`cvm_p` is what to read there. Both columns are named for their test, so
-a p-value is never read without knowing where it came from, and
-[`print()`](https://rdrr.io/r/base/print.html) shows the one that
+## How it works
+
+1.  Checks that `mrds` is installed, that `models` is a model set, and
+    that `truncation` is a single positive number.
+
+2.  Prepares the data with
+    [`prepare_distance_data()`](https://camilleross.org/dsfit/reference/prepare_distance_data.md):
+    validates the distances, drops rows with no distance or outside the
+    truncation, and decides whether the fit is binned.
+
+3.  Warns if `left` is set and the model set contains the gamma key.
+
+4.  Fits each candidate with
+    [`mrds::ddf()`](https://rdrr.io/pkg/mrds/man/ddf.html). A candidate
+    that errors or does not converge is recorded as a failure and the
+    sweep continues.
+
+5.  Builds the selection table, sorted by AIC, and prints a short report
+    unless `quiet = TRUE`.
+
+## Truncation is one value per sweep
+
+AIC only compares models fitted to the same data. A different truncation
+keeps a different set of detections, so the AICs are not comparable. To
+compare truncations, run one sweep per truncation and check whether the
+chosen model and its `p` stay stable.
+
+## What the table reports besides AIC
+
+The effective strip half-width (esw) is the width of a strip in which
+detection is certain that would yield the same expected number of
+detections. It goes directly into density. Two models within 2 AIC of
+each other can have quite different esw, so the table reports `p`
+(average detection probability), its standard error and CV, and `esw`
+next to AIC.
+
+A goodness-of-fit p-value is also reported. The null hypothesis is that
+the fitted function describes the observed distances, so a small p-value
+is evidence against the model. The top AIC model can still fail this
+test.
+
+## Which goodness-of-fit test to read
+
+Exact distances get a Cramer-von Mises test (`cvm_p`), which tests their
+empirical distribution. Binned distances have no empirical distribution,
+so they get a chi-square test over the survey's own bins (`chisq_p`).
+`chisq_p` is also filled in for exact distances, but over cutpoints
+`mrds` chooses; read `cvm_p` there. Printing a sweep shows the test that
 applies.
 
-A chi-square over few bins runs out of degrees of freedom quickly —
-three bins and a two-parameter key leave none — and `mrds` returns `NA`
-rather than a p-value when it does. That is a converged model with no
-goodness-of-fit test available, not a failed one.
+A chi-square test over few bins can have no degrees of freedom left (for
+example three bins and a two-parameter key). `mrds` then returns `NA`.
+The model converged; it just has no chi-square test.
 
-## Binned and exact distances cannot be swept together
+## Binned and exact distances cannot be mixed
 
-`STRIP`-derived distances are intervals and are fitted binned; angle-
-and position-derived distances are points. The likelihoods differ, so
-their AICs are not comparable, and a table containing both would be a
-survey-era boundary rather than a model set. Data carrying both is
-refused.
+Distances from `STRIP` records are intervals and are fitted binned.
+Distances from angles or positions are exact. The two likelihoods
+differ, so their AICs are not comparable. Data containing both is
+refused; split it and run one sweep for each.
 
-## Left truncation and the gamma key are alternatives
+## Left truncation and the gamma key
 
-Both describe a platform that cannot see beneath itself — an aircraft's
-flat windows, or a hull. Applying `left` to a model set that contains
-the gamma key accounts for the blind spot twice, and warns.
+Both model a platform that cannot see directly beneath itself. Using
+both accounts for the blind spot twice, so setting `left` for a model
+set that contains the gamma key gives a warning.
 
-## This does not estimate g(0)
+## Monotonicity constraint
 
-Every fit here conditions on the animal having been available and seen.
-For a deep-diving species that assumption biases density low, and no
-amount of model selection detects it — a mis-specified `g(0)` shifts
-every candidate in the set by the same factor, so the ranking looks
-untouched. Correct for it at the abundance step, from external sources,
-with its standard error propagated.
+As in `Distance::ds()`, a candidate with adjustment terms and no
+covariates is fitted with a strict monotonicity constraint
+(`mono = TRUE, mono.strict = TRUE` in `mrds`). This stops g(x), the
+detection probability at distance x, from exceeding 1 or turning upward.
+AIC and `p` then match `ds()` with its defaults. Covariate models are
+unconstrained, as in `ds()`. The gamma key is also unconstrained,
+because it rises to a peak by design.
+
+## g(0) is assumed to be 1
+
+Every fit assumes an animal on the track-line is always detected. A
+wrong g(0) scales every candidate by the same factor, so model selection
+cannot detect it. Correct for it at the abundance step, from external
+sources, and propagate its standard error (see
+[`g0()`](https://camilleross.org/dsfit/reference/g0.md)).
 
 ## References
 
@@ -164,7 +202,7 @@ sw
 #>   Rank on esw and p_cv as well as dAIC: models within 2 AIC can
 #>   imply materially different abundance. g(0) = 1 is assumed.
 
-# AIC alone would not have told you this
+# Compare esw and p_cv as well as delta AIC
 selection_table(sw)[, c("model_id", "delta_aic", "p", "p_cv", "esw")]
 #> # A tibble: 3 × 5
 #>   model_id delta_aic     p   p_cv   esw

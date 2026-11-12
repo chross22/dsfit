@@ -15,6 +15,32 @@ remotes::install_github("chross22/dsfit")
 
 Plotting uses [fancyfx](https://github.com/chross22/fancyfx), optional.
 
+## Pipeline
+
+A basic analysis is five numbered scripts, installed with the package.
+Each reads the previous step’s output from `dsfit-output/`.
+
+| Script | Step |
+|----|----|
+| `01-load-data.R` | Load the detections |
+| `02-check-data.R` | Check the data; choose truncation and covariates |
+| `03-fit-detection-functions.R` | Fit every candidate and rank them |
+| `04-inspect-and-plot.R` | Choose a model and plot g(x) |
+| `05-g0-correction.R` | Build the g(0) correction for the abundance step |
+
+``` r
+
+scripts <- system.file("scripts", package = "dsfit")
+file.copy(list.files(scripts, full.names = TRUE), ".")
+for (f in sort(list.files(".", pattern = "^0[1-5].*\\.R$"))) source(f)
+```
+
+They run as shipped on simulated data. Edit the Settings block at the
+top of each for real data. Step by step:
+[docs/03-running-a-pipeline.md](https://camilleross.org/dsfit/docs/03-running-a-pipeline.md).
+
+The sections below are the same steps as single function calls.
+
 ## Example data
 
 ``` r
@@ -141,6 +167,7 @@ prepare_distance_data(detections, truncation = 400)                 # the input 
 
 | Topic | File |
 |----|----|
+| Running a pipeline | [docs/03-running-a-pipeline.md](https://camilleross.org/dsfit/docs/03-running-a-pipeline.md) |
 | Code guide | [docs/02-code-guide.md](https://camilleross.org/dsfit/docs/02-code-guide.md) ([PDF](https://camilleross.org/dsfit/docs/02-code-guide.pdf)) |
 | Design and guards | [docs/01-plan.md](https://camilleross.org/dsfit/docs/01-plan.md) |
 

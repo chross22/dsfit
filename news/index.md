@@ -326,10 +326,10 @@ described in `distsamp`’s `docs/07-fitting-architecture.md`.
   over them between about 0.25 and 0.85. Shipped so the worked example
   can show the full API, standard errors included.
 
-- The test suite now reconciles against a published result. January’s
-  16% surface time and reported 0.27 availability, at a measured 51.22 s
-  in view, pin the dive time at about 6.1 minutes — inside the 1.30 to
-  8.83 min range the paper gives for monthly mean dive times.
+- A test reconciling against Ganley et al.’s January figures was added
+  here and later removed: it read the 16% surface time as
+  `E(s)/(E(s)+E(d))`, which Table S1 shows it is not (see
+  [`?ganley_availability`](https://camilleross.org/dsfit/reference/ganley_availability.md)).
 
 ### What it refuses, and why
 
@@ -388,6 +388,64 @@ hard way:
   [`match.arg()`](https://rdrr.io/r/base/match.arg.html) rejects those
   outright, so the choices are resolved by hand.
 
+### Documentation and a numbered pipeline (2026-11-12)
+
+- Five numbered scripts in `inst/scripts/` run a basic analysis end to
+  end: load, check, fit, plot, g(0). `docs/03-running-a-pipeline.md`
+  walks through them, and the README lists them.
+- Help pages rewritten in plainer language, each exported function with
+  a “How it works” list of its steps. Internal functions have header
+  comments and their bodies step comments. The getting-started vignette
+  is a numbered walk-through of the same pipeline.
+- Fixed while documenting:
+  [`diagnose_sweep()`](https://camilleross.org/dsfit/reference/diagnose_sweep.md)
+  warned about missing covariate values on empty samples that are
+  dropped before fitting, and claimed a gradual onset it had too few
+  detections to test. Circling distances beyond the truncation are no
+  longer counted.
+- The adjustment-model regression test compares with a 0.1% tolerance
+  instead of a text snapshot. Fits under the monotonicity constraint
+  differ between platforms in the fourth decimal, which failed CI on
+  Linux and Windows; the other five snapshots are unconstrained and stay
+  exact.
+
+### Second audit (2026-11-12)
+
+Three independent reviews; full list in `docs/02-code-guide.md`, Section
+10.1.
+
+- **Changes numbers.** Adjustment models without covariates are fitted
+  with the strict monotonicity constraint `Distance::ds()` applies by
+  default, and now match its AIC and `p`. The adjustment snapshot
+  changes accordingly.
+- **Changes numbers.**
+  [`view_window_vessel()`](https://camilleross.org/dsfit/reference/view_window_vessel.md)
+  was wrong for a vector of distances on an arc narrower than 90
+  degrees, and `view_window_aerial(angle =)` was missing a factor of 2
+  (a view runs `angle` forward *and* aft). Both feed
+  [`availability()`](https://camilleross.org/dsfit/reference/availability.md)
+  and [`g0()`](https://camilleross.org/dsfit/reference/g0.md). Windows
+  from `slope =` are unchanged.
+- A binned flatfile with an all-`NA` `distance` column now fits; every
+  candidate previously failed.
+- [`effect_estimates_ddf()`](https://camilleross.org/dsfit/reference/effect_estimates_ddf.md)
+  works for the uniform key (was `NaN`) and takes a factor covariate’s
+  level in `at =`; its band always contains the estimate.
+- New refusals, each with a message naming the cause: non-numeric or
+  negative distances, duplicated `object`, `breaks` that are unsorted or
+  miss the recorded bins, infinite `truncation`, a `models` that is not
+  a model set, two-sided formulas, lengths that do not recycle evenly in
+  [`availability()`](https://camilleross.org/dsfit/reference/availability.md),
+  and malformed [`g0()`](https://camilleross.org/dsfit/reference/g0.md)
+  components. Duplicate candidates are dropped with a warning. Bins
+  converted between units tile.
+- [`diagnose_sweep()`](https://camilleross.org/dsfit/reference/diagnose_sweep.md)
+  no longer counts empty samples as truncation loss.
+  [`detection_structure()`](https://camilleross.org/dsfit/reference/detection_structure.md)
+  matches NARWC names without regard to case.
+- The availability vignette’s code now runs, replacing stale printed
+  output.
+
 ### Bug fixes
 
 - `esw` was `p` times the truncation width even when `left` was set,
@@ -438,6 +496,7 @@ hard way:
 
 ### Not yet built
 
-`g(0)` correction, the `dsm` handoff, plotting detectability against a
-covariate (a different quantity from g(x), and not the same plot), and a
-vignette.
+The `dsm` handoff, and plotting detectability against a covariate (a
+different quantity from g(x), and not the same plot). The `g(0)`
+correction slot and the vignettes listed under that heading at first
+have since been built.
